@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ACC Time Study Stopwatch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      margin-top: 40px;
+      background: #020617;
+      border-radius: 16px;
+      padding: 24px;
+      width: 95%;
+      max-width: 1000px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      border: 1px solid #1f2937;
+    }
+
+    .logo-acc {
+      width: 160px;
+      display: block;
+      margin: 0 auto 8px auto;
+      padding-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 1.4rem;
+      text-align: center;
+      color: #f9fafb;
+      letter-spacing: 0.04em;
+    }
+
+    .top-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: stretch;
+      margin-bottom: 12px;
+      justify-content: space-between;
+    }
+
+    .timer-display {
+      text-align: center;
+      font-size: 3rem;
+      font-variant-numeric: tabular-nums;
+      padding: 16px 8px;
+      margin-bottom: 8px;
+      background: radial-gradient(circle at top, #111827, #020617);
+      border-radius: 12px;
+      border: 1px solid #374151;
+      flex: 1 1 220px;
+    }
+
+    .inputs-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 260px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field label {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    .field input,
+    .field select {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.9rem;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      min-width: 90px;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+    }
+
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-start {
+      background: #22c55e;
+      color: #022c22;
+      box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-pause {
+      background: #eab308;
+      color: #292524;
+      box-shadow: 0 3px 10px rgba(234, 179, 8, 0.3);
+    }
+
+    .btn-lap {
+      background: #3b82f6;
+      color: #eff6ff;
+      box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-reset {
+      background: #ef4444;
+      color: #fef2f2;
+      box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-export {
+      background: #0ea5e9;
+      color: #e0f2fe;
+      box-shadow: 0 3px 10px rgba(14, 165, 233, 0.3);
+    }
+
+    .lap-indicator {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 10px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 2fr 1.4fr;
+      gap: 12px;
+    }
+
+    .laps-container,
+    .summary-container {
+      margin-top: 8px;
+      max-height: 380px;
+      overflow-y: auto;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      background: #020617;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      background: #030712;
+      z-index: 1;
+    }
+
+    th, td {
+      padding: 6px 6px;
+      text-align: right;
+      border-bottom: 1px solid #111827;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child {
+      text-align: center;
+    }
+
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    th {
+      font-weight: 500;
+      color: #9ca3af;
+    }
+
+    tr:nth-child(even) td {
+      background: #020617;
+    }
+
+    tr:nth-child(odd) td {
+      background: #020617;
+    }
+
+    .section-title {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      border-bottom: 1px solid #111827;
+      background: #030712;
+    }
+
+    .global-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px 10px 8px;
+      border-bottom: 1px solid #111827;
+      background: #020617;
+      font-size: 0.75rem;
+    }
+
+    .stat-pill {
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      padding: 3px 8px;
+      color: #9ca3af;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .timer-display {
+        font-size: 2.4rem;
+      }
+      button {
+        flex: 1 1 calc(50% - 12px);
+      }
+      th, td {
+        padding: 4px 3px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+
+    <img src="acc_logo.png" class="logo-acc" alt="ACC">
+
+    <h1>ACC Time Study Stopwatch</h1>
+
+    <div class="top-row">
+      <div class="timer-display" id="display">
+        00:00.00
+      </div>
+
+      <div class="inputs-block">
+        <div class="field">
+          <label for="processName">Process / Operation:</label>
+          <input id="processName" type="text" placeholder="e.g. OP10 Roughing">
+        </div>
+        <div class="field">
+          <label for="timeType">Time type:</label>
+          <select id="timeType">
+            <option value="Cycle Time">Cycle Time</option>
+            <option value="Machine & Load/Unload Time">Machine & Load/Unload Time</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-start" id="btnStart">Start</button>
+      <button class="btn-pause" id="btnPause">Pause</button>
+      <button class="btn-lap" id="btnLap">Lap</button>
+      <button class="btn-reset" id="btnReset">Reset</button>
+      <button class="btn-export" id="btnExport">Export CSV</button>
+    </div>
+
+    <div class="lap-indicator" id="lapIndicator">
+      Next Lap: T1
+    </div>
+
+    <div class="layout">
+      <div class="laps-container">
+        <div class="section-title">Recorded cycles</div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Proc</th>
+              <th>Mode</th>
+              <th>T1</th>
+              <th>T2</th>
+              <th>Tot</th>
+            </tr>
+          </thead>
+          <tbody id="lapsBody">
+            <!-- cycles -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="summary-container">
+        <div class="section-title">Summary by proc & mode</div>
+        <div class="global-stats">
+          <div class="stat-pill" id="statN">N: 0</div>
+          <div class="stat-pill" id="statAvg1">Avg1: -</div>
+          <div class="stat-pill" id="statMed1">Med1: -</div>
+          <div class="stat-pill" id="statAvg2">Avg2: -</div>
+          <div class="stat-pill" id="statMed2">Med2: -</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Proc</th>
+              <th>Mode</th>
+              <th>N1</th>
+              <th>N2</th>
+              <th>Avg1</th>
+              <th>Med1</th>
+              <th>Avg2</th>
+              <th>Med2</th>
+            </tr>
+          </thead>
+          <tbody id="summaryBody">
+            <!-- summary -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let startTime = 0;
+    let elapsed = 0;
+    let timerInterval = null;
+    let running = false;
+
+    // each cycle = { idx, process, mode, t1, t2 }
+    let cycles = [];
+    let partialT1 = null; // used only in Machine & Load/Unload mode
+
+    const display = document.getElementById('display');
+    const lapsBody = document.getElementById('lapsBody');
+    const summaryBody = document.getElementById('summaryBody');
+
+    const btnStart = document.getElementById('btnStart');
+    const btnPause = document.getElementById('btnPause');
+    const btnLap = document.getElementById('btnLap');
+    const btnReset = document.getElementById('btnReset');
+    const btnExport = document.getElementById('btnExport');
+
+    const processInput = document.getElementById('processName');
+    const timeTypeSelect = document.getElementById('timeType');
+
+    const statN = document.getElementById('statN');
+    const statAvg1 = document.getElementById('statAvg1');
+    const statMed1 = document.getElementById('statMed1');
+    const statAvg2 = document.getElementById('statAvg2');
+    const statMed2 = document.getElementById('statMed2');
+
+    const lapIndicator = document.getElementById('lapIndicator');
+
+    function formatTime(ms) {
+      if (ms == null) return '-';
+      const totalSeconds = ms / 1000;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      const centiseconds = Math.floor((totalSeconds - Math.floor(totalSeconds)) * 100);
+
+      const mm = String(minutes).padStart(2, '0');
+      const ss = String(seconds).padStart(2, '0');
+      const cc = String(centiseconds).padStart(2, '0');
+
+      return `${mm}:${ss}.${cc}`;
+    }
+
+    function updateDisplay() {
+      const now = Date.now();
+      elapsed = now - startTime;
+      display.textContent = formatTime(elapsed);
+    }
+
+    function updateLapIndicator() {
+      const mode = timeTypeSelect.value;
+      if (mode === 'Cycle Time') {
+        lapIndicator.textContent = 'Next Lap: T1';
+      } else {
+        // Machine & Load/Unload Time
+        if (partialT1 == null) {
+          lapIndicator.textContent = 'Next Lap: T1';
+        } else {
+          lapIndicator.textContent = 'Next Lap: T2';
+        }
+      }
+    }
+
+    function startTimer() {
+      if (running) return;
+      running = true;
+      startTime = Date.now();
+      elapsed = 0;
+      partialT1 = null;
+      display.textContent = '00:00.00';
+      updateLapIndicator();
+      timerInterval = setInterval(updateDisplay, 10);
+    }
+
+    function pauseTimer() {
+      if (!running) return;
+      running = false;
+      clearInterval(timerInterval);
+      updateDisplay();
+    }
+
+    function resetTimer() {
+      running = false;
+      clearInterval(timerInterval);
+      elapsed = 0;
+      partialT1 = null;
+      display.textContent = '00:00.00';
+      cycles = [];
+      renderCycles();
+      renderSummary();
+      saveState();
+      updateLapIndicator();
+    }
+
+    function handleLap() {
+      if (!running) return;
+
+      const mode = timeTypeSelect.value;
+      const proc = processInput.value.trim() || 'No name';
+
+      const now = Date.now();
+      const t = now - startTime; // ms for this segment
+
+      if (mode === 'Cycle Time') {
+        // simple: one time per lap -> T1 only
+        const cycle = {
+          idx: cycles.length + 1,
+          process: proc,
+          mode,
+          t1: t,
+          t2: null
+        };
+        cycles.push(cycle);
+
+        // prepare for next cycle
+        startTime = Date.now();
+        elapsed = 0;
+        partialT1 = null;
+        display.textContent = '00:00.00';
+
+        renderCycles();
+        renderSummary();
+        saveState();
+        updateLapIndicator();
+      } else {
+        // Machine & Load/Unload Time -> two segments per lap
+        if (partialT1 == null) {
+          // first press of Lap for this lap -> T1
+          partialT1 = t;
+
+          // start timing second segment
+          startTime = Date.now();
+          elapsed = 0;
+          display.textContent = '00:00.00';
+          updateLapIndicator();
+        } else {
+          // second press of Lap -> T2 completes the lap
+          const t2 = t;
+          const cycle = {
+            idx: cycles.length + 1,
+            process: proc,
+            mode,
+            t1: partialT1,
+            t2: t2
+          };
+          cycles.push(cycle);
+
+          // reset for next lap
+          partialT1 = null;
+          startTime = Date.now();
+          elapsed = 0;
+          display.textContent = '00:00.00';
+
+          renderCycles();
+          renderSummary();
+          saveState();
+          updateLapIndicator();
+        }
+      }
+    }
+
+    function renderCycles() {
+      lapsBody.innerHTML = '';
+      cycles.slice().reverse().forEach(cycle => {
+        const tr = document.createElement('tr');
+
+        const tdIdx = document.createElement('td');
+        tdIdx.textContent = cycle.idx;
+
+        const tdProc = document.createElement('td');
+        tdProc.textContent = cycle.process;
+
+        const tdMode = document.createElement('td');
+        tdMode.textContent = cycle.mode === 'Cycle Time' ? 'CT' : 'M+L/D';
+
+        const tdT1 = document.createElement('td');
+        tdT1.textContent = formatTime(cycle.t1);
+
+        const tdT2 = document.createElement('td');
+        tdT2.textContent = formatTime(cycle.t2);
+
+        const tdTot = document.createElement('td');
+        const tot = (cycle.t1 || 0) + (cycle.t2 || 0);
+        tdTot.textContent = tot > 0 ? formatTime(tot) : '-';
+
+        tr.appendChild(tdIdx);
+        tr.appendChild(tdProc);
+        tr.appendChild(tdMode);
+        tr.appendChild(tdT1);
+        tr.appendChild(tdT2);
+        tr.appendChild(tdTot);
+
+        lapsBody.appendChild(tr);
+      });
+    }
+
+    function computeStats(valuesMs) {
+      if (!valuesMs || valuesMs.length === 0) return null;
+      const sorted = valuesMs.slice().sort((a, b) => a - b);
+      const n = sorted.length;
+      const sum = sorted.reduce((acc, v) => acc + v, 0);
+      const avg = sum / n;
+      let med;
+      if (n % 2 === 1) {
+        med = sorted[(n - 1) / 2];
+      } else {
+        med = (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+      }
+      return { n, avg, med };
+    }
+
+    function renderSummary() {
+      summaryBody.innerHTML = '';
+
+      const allT1 = cycles.map(c => c.t1).filter(v => v != null);
+      const allT2 = cycles.map(c => c.t2).filter(v => v != null);
+
+      const s1 = computeStats(allT1);
+      const s2 = computeStats(allT2);
+
+      statN.textContent = `N: ${cycles.length}`;
+      statAvg1.textContent = `Avg1: ${s1 ? formatTime(s1.avg) : '-'}`;
+      statMed1.textContent = `Med1: ${s1 ? formatTime(s1.med) : '-'}`;
+      statAvg2.textContent = `Avg2: ${s2 ? formatTime(s2.avg) : '-'}`;
+      statMed2.textContent = `Med2: ${s2 ? formatTime(s2.med) : '-'}`;
+
+      // group by process + mode
+      const groups = {};
+      cycles.forEach(c => {
+        const key = c.process + '||' + c.mode;
+        if (!groups[key]) {
+          groups[key] = {
+            process: c.process,
+            mode: c.mode,
+            t1: [],
+            t2: []
+          };
+        }
+        if (c.t1 != null) groups[key].t1.push(c.t1);
+        if (c.t2 != null) groups[key].t2.push(c.t2);
+      });
+
+      Object.keys(groups).forEach(key => {
+        const g = groups[key];
+        const st1 = computeStats(g.t1);
+        const st2 = computeStats(g.t2);
+
+        const tr = document.createElement('tr');
+
+        const tdProc = document.createElement('td');
+        tdProc.textContent = g.process;
+        tdProc.style.textAlign = 'left';
+
+        const tdMode = document.createElement('td');
+        tdMode.textContent = g.mode === 'Cycle Time' ? 'CT' : 'M+L/D';
+
+        const tdN1 = document.createElement('td');
+        tdN1.textContent = st1 ? st1.n : 0;
+
+        const tdN2 = document.createElement('td');
+        tdN2.textContent = st2 ? st2.n : 0;
+
+        const tdAvg1 = document.createElement('td');
+        tdAvg1.textContent = st1 ? formatTime(st1.avg) : '-';
+
+        const tdMed1 = document.createElement('td');
+        tdMed1.textContent = st1 ? formatTime(st1.med) : '-';
+
+        const tdAvg2 = document.createElement('td');
+        tdAvg2.textContent = st2 ? formatTime(st2.avg) : '-';
+
+        const tdMed2 = document.createElement('td');
+        tdMed2.textContent = st2 ? formatTime(st2.med) : '-';
+
+        tr.appendChild(tdProc);
+        tr.appendChild(tdMode);
+        tr.appendChild(tdN1);
+        tr.appendChild(tdN2);
+        tr.appendChild(tdAvg1);
+        tr.appendChild(tdMed1);
+        tr.appendChild(tdAvg2);
+        tr.appendChild(tdMed2);
+
+        summaryBody.appendChild(tr);
+      });
+    }
+
+    function exportCSV() {
+      if (cycles.length === 0) {
+        alert('No cycles to export.');
+        return;
+      }
+
+      const header = [
+        'Cycle',
+        'Process',
+        'Mode',
+        'T1_ms',
+        'T1_fmt',
+        'T2_ms',
+        'T2_fmt',
+        'Tot_ms',
+        'Tot_fmt'
+      ];
+
+      const rows = [header];
+
+      cycles.forEach(c => {
+        const tot = (c.t1 || 0) + (c.t2 || 0);
+        rows.push([
+          c.idx,
+          c.process,
+          c.mode,
+          c.t1 ?? '',
+          formatTime(c.t1),
+          c.t2 ?? '',
+          formatTime(c.t2),
+          tot || '',
+          tot ? formatTime(tot) : ''
+        ]);
+      });
+
+      const csvContent = rows
+        .map(r => r
+          .map(v => {
+            const s = String(v).replace(/"/g, '""');
+            return `"${s}"`;
+          })
+          .join(',')
+        )
+        .join('\r\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'acc_time_study.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function saveState() {
+      try {
+        const data = { cycles };
+        localStorage.setItem('accTimeStudyV3', JSON.stringify(data));
+      } catch (e) {
+        console.warn('Cannot save state:', e);
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem('accTimeStudyV3');
+        if (!raw) {
+          updateLapIndicator();
+          return;
+        }
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.cycles)) {
+          cycles = data.cycles;
+          renderCycles();
+          renderSummary();
+        }
+        partialT1 = null;
+        updateLapIndicator();
+      } catch (e) {
+        console.warn('Cannot load state:', e);
+        updateLapIndicator();
+      }
+    }
+
+    btnStart.addEventListener('click', startTimer);
+    btnPause.addEventListener('click', pauseTimer);
+    btnReset.addEventListener('click', resetTimer);
+    btnLap.addEventListener('click', handleLap);
+    btnExport.addEventListener('click', exportCSV);
+    timeTypeSelect.addEventListener('change', () => {
+      partialT1 = null;
+      updateLapIndicator();
+    });
+
+    loadState();
+  </script>
+</body>
+</html>
