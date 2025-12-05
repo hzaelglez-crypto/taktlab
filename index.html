@@ -41,17 +41,25 @@
     padding-bottom: 48px;
   }
 
-  /* Top sticky bar with logo */
+  /* Top sticky bar with logo + credit */
   .top-bar {
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 60;
     background: rgba(5, 11, 25, 0.98);
     border-bottom: 1px solid #1c3154;
-    padding: 8px 12px;
+    padding: 6px 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+  }
+
+  .top-credit {
+    font-size: 0.65rem;
+    color: rgba(192, 204, 232, 0.85);
+    font-weight: 300;
+    margin-right: 6px;
+    white-space: nowrap;
   }
 
   .logo-circle {
@@ -133,19 +141,19 @@
     color: var(--text-soft);
   }
 
-  /* Sticky stopwatch + control bar */
+  /* Sticky stopwatch bar (ONLY chrono + start + lap) */
   .sticky-panel {
     position: sticky;
-    top: 58px; /* below top-bar */
-    z-index: 40;
-    padding: 8px 12px 0;
+    top: 52px; /* below top-bar */
+    z-index: 50;
+    padding: 6px 12px 0;
     background: linear-gradient(to bottom, rgba(5, 11, 25, 0.98), rgba(5, 11, 25, 0.9));
   }
 
   .stopwatch-card {
     background: var(--bg-card);
     border-radius: 18px;
-    padding: 12px 12px 16px;
+    padding: 10px 12px 12px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.45);
   }
 
@@ -153,11 +161,11 @@
     width: 100%;
     background: #020817;
     border-radius: 16px;
-    padding: 16px 18px;
+    padding: 14px 18px;
     text-align: center;
-    font-size: 2.5rem;
+    font-size: 2.3rem;
     letter-spacing: 0.12em;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     border: 1px solid #1a2f55;
   }
 
@@ -211,18 +219,59 @@
     border-radius: 10px;
   }
 
-  .inputs-row {
-    margin-top: 10px;
+  /* Inputs & indicators (scrollable) */
+  .cards {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 10px 10px 12px;
+    border: 1px solid #152749;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.45);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .card-header h2 {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .card-header small {
+    color: var(--text-soft);
+    font-size: 0.72rem;
+  }
+
+  .subsection-title {
+    margin-top: 8px;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-soft);
+  }
+
+  .inputs-row,
+  .inputs-row-4 {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0,1fr));
     gap: 8px;
   }
 
+  .inputs-row {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+
   .inputs-row-4 {
-    margin-top: 8px;
-    display: grid;
     grid-template-columns: repeat(4, minmax(0,1fr));
-    gap: 6px;
   }
 
   @media (max-width: 600px) {
@@ -284,7 +333,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0,1fr));
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 8px;
   }
 
   .t-indicator {
@@ -341,39 +390,6 @@
     opacity: 0.5;
   }
 
-  /* Main content cards */
-  .cards {
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .card {
-    background: var(--bg-card);
-    border-radius: 16px;
-    padding: 10px 10px 12px;
-    border: 1px solid #152749;
-    box-shadow: 0 12px 24px rgba(0,0,0,0.45);
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-  }
-
-  .card-header h2 {
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-
-  .card-header small {
-    color: var(--text-soft);
-    font-size: 0.72rem;
-  }
-
   /* Tables */
   table {
     width: 100%;
@@ -406,10 +422,6 @@
 
   tbody tr:nth-child(odd) {
     background: #091427;
-  }
-
-  tbody tr.highlight {
-    background: rgba(24, 195, 122, 0.2);
   }
 
   td input, td select {
@@ -457,25 +469,6 @@
     min-width: 120px;
   }
 
-  /* Pills */
-  .pill {
-    border-radius: 999px;
-    padding: 3px 8px;
-    font-size: 0.7rem;
-    border: 1px solid #273453;
-    color: var(--text-soft);
-  }
-
-  .pill-ok {
-    border-color: var(--good);
-    color: var(--good);
-  }
-
-  .pill-bad {
-    border-color: var(--bad);
-    color: var(--bad);
-  }
-
   canvas {
     width: 100%;
     max-height: 220px;
@@ -491,12 +484,34 @@
     font-size: 0.6rem;
     color: #6f7ca5;
   }
+
+  /* Flash overlay for LAP feedback */
+  #flashOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.4);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 100;
+  }
+
+  .flash-active {
+    animation: flashPulse 120ms ease-out;
+  }
+
+  @keyframes flashPulse {
+    0% { opacity: 0; }
+    30% { opacity: 0.45; }
+    100% { opacity: 0; }
+  }
 </style>
 </head>
 <body>
 <div class="page">
+
   <!-- TOP BAR -->
   <div class="top-bar">
+    <div class="top-credit">Created by Roberto Glez</div>
     <div class="logo-circle">
       <div class="logo-gear"></div>
       <div class="logo-ring"></div>
@@ -507,13 +522,28 @@
     </div>
   </div>
 
-  <!-- STICKY STOPWATCH & CONTROLS -->
+  <!-- FLASH OVERLAY -->
+  <div id="flashOverlay"></div>
+
+  <!-- STICKY STOPWATCH (ONLY chrono + start/lap) -->
   <div class="sticky-panel">
     <div class="stopwatch-card">
       <div id="stopwatchDisplay" class="stopwatch-display">00:00.00</div>
       <div class="stopwatch-grid">
         <button id="startPauseBtn" class="btn btn-primary">Start</button>
         <button id="lapBtn" class="btn btn-accent">LAP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CARDS (SCROLLABLE) -->
+  <div class="cards">
+
+    <!-- SETUP & MODE -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Timing &amp; Contract Setup</h2>
+        <small>Process, mode, contract and efficiency inputs</small>
       </div>
 
       <div class="inputs-row">
@@ -530,7 +560,7 @@
         </div>
       </div>
 
-      <div class="inputs-row-4">
+      <div class="inputs-row-4" style="margin-top:8px;">
         <div class="field">
           <label for="contractPcd">Contract pieces/day</label>
           <input id="contractPcd" type="number" min="0" step="1" placeholder="1200" />
@@ -550,8 +580,8 @@
       </div>
 
       <div class="mode-badges">
-        <span class="badge">CT from total cycle time</span>
-        <span class="badge badge-ml">M+L/D keeps T1 + T2 separated</span>
+        <span class="badge">Cycle Time = total CT per piece</span>
+        <span class="badge badge-ml">M+L/D keeps T1 + T2 separated &amp; summed</span>
       </div>
 
       <div class="t-indicator-wrap">
@@ -571,17 +601,15 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- MAIN CARDS -->
-  <div class="cards">
-    <!-- PROCESS SUMMARY TABLE + STATS -->
+    <!-- SUMMARY BLOCK -->
     <div class="card">
       <div class="card-header">
-        <h2>Process Capacity Overview</h2>
-        <small>Median CT, capacity and % vs contract per process</small>
+        <h2>Process Capacity Overview &amp; Statistics</h2>
+        <small>Median CT, stats, capacity and contract check per process</small>
       </div>
 
+      <!-- Overview with stats -->
       <div style="overflow-x:auto; max-height:260px;">
         <table id="summaryTable">
           <thead>
@@ -590,6 +618,10 @@
               <th>Mode</th>
               <th>N</th>
               <th>CTmed (s)</th>
+              <th>Mean (s)</th>
+              <th>σ (s)</th>
+              <th>Cp</th>
+              <th>Cpk</th>
               <th>Cap 100% (pph)</th>
               <th>Cap @Eff% (pph)</th>
               <th>% vs contract</th>
@@ -599,15 +631,35 @@
         </table>
       </div>
 
-      <!-- Selector + Cp/Cpk & percentiles justo debajo -->
-      <div class="field" style="margin-top:6px;">
-        <label for="statsProcessSelect">Stats focus (Cp/Cpk &amp; percentiles)</label>
+      <!-- Stats focus -->
+      <div class="subsection-title">Stats focus (Cp/Cpk, percentiles &amp; N)</div>
+      <div class="field">
+        <label for="statsProcessSelect">Process / Mode</label>
         <select id="statsProcessSelect"></select>
       </div>
       <div id="capabilitySummary" style="margin-top:4px; font-size:0.74rem; color:var(--text-soft);">
         Select a process to see Cp/Cpk, percentiles and N.
       </div>
 
+      <!-- Contract vs capacity summary -->
+      <div class="subsection-title" style="margin-top:10px;">Contract vs Capacity Summary</div>
+      <div style="overflow-x:auto; max-height:220px;">
+        <table id="complianceTable">
+          <thead>
+            <tr>
+              <th>Process</th>
+              <th>Mode</th>
+              <th>CTmed (s)</th>
+              <th>Cap @Eff (pph)</th>
+              <th>% vs contract</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="complianceBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Buttons -->
       <div class="copy-row">
         <button id="copyAllBtn" class="btn btn-ghost btn-small">Copy All</button>
         <button id="copySummaryBtn" class="btn btn-ghost btn-small">Copy Summary</button>
@@ -616,7 +668,7 @@
       </div>
     </div>
 
-    <!-- LAPS TABLE -->
+    <!-- RAW DATA -->
     <div class="card">
       <div class="card-header">
         <h2>Raw Cycle-Time Data</h2>
@@ -642,10 +694,10 @@
       </div>
     </div>
 
-    <!-- CAPABILITY & GRAPHS (visual only) -->
+    <!-- GRAPHS -->
     <div class="card">
       <div class="card-header">
-        <h2>Distribution & Capability Plots</h2>
+        <h2>Distribution &amp; Capability Plots</h2>
         <small>Visual support for the stats above</small>
       </div>
       <div class="field" style="margin-bottom:6px;">
@@ -655,29 +707,6 @@
       <canvas id="histCanvas"></canvas>
       <canvas id="xbarCanvas"></canvas>
       <canvas id="capCanvas"></canvas>
-    </div>
-
-    <!-- CONTRACT vs CAPACITY SUMMARY AS TABLE -->
-    <div class="card">
-      <div class="card-header">
-        <h2>Contract vs Capacity Summary</h2>
-        <small>Median CT, capacity @Eff and verdict vs contract</small>
-      </div>
-      <div style="overflow-x:auto; max-height:260px;">
-        <table id="complianceTable">
-          <thead>
-            <tr>
-              <th>Process</th>
-              <th>Mode</th>
-              <th>CTmed (s)</th>
-              <th>Cap @Eff (pph)</th>
-              <th>% vs contract</th>
-              <th>Verdict</th>
-            </tr>
-          </thead>
-          <tbody id="complianceBody"></tbody>
-        </table>
-      </div>
     </div>
 
     <div class="footer-note">
@@ -708,7 +737,7 @@
   const statsProcessSelect = document.getElementById("statsProcessSelect");
   const contractPcdInput = document.getElementById("contractPcd");
   const hoursPerDayInput = document.getElementById("hoursPerDay");
-  const daysPerWeekInput = document.getElementById("daysPerWeek");
+  const daysPerWeekInput = document.getElementById("daysPerWeek"); // guardado por si lo usamos después
   const efficiencyInput = document.getElementById("efficiency");
   const t1Indicator = document.getElementById("t1Indicator");
   const t2Indicator = document.getElementById("t2Indicator");
@@ -720,6 +749,7 @@
   const resetBtn = document.getElementById("resetBtn");
   const capabilitySummary = document.getElementById("capabilitySummary");
   const complianceBody = document.getElementById("complianceBody");
+  const flashOverlay = document.getElementById("flashOverlay");
 
   const histCanvas = document.getElementById("histCanvas");
   const xbarCanvas = document.getElementById("xbarCanvas");
@@ -744,7 +774,6 @@
     const elapsed = now - startTime + elapsedBeforePause;
     displayEl.textContent = formatTime(elapsed);
 
-    // live T1/T2 short feedback when in M+L mode
     if (modeSelect.value === "ml" && lastSegStart !== null) {
       const segElapsed = now - lastSegStart;
       const value = (segElapsed / 1000).toFixed(1);
@@ -786,7 +815,6 @@
     startPauseBtn.textContent = "Start";
     elapsedBeforePause = 0;
     lastSegStart = null;
-    // detener el giro de los aros
     t1Indicator.classList.remove("active");
     t2Indicator.classList.remove("active");
     t1Indicator.classList.add("waiting");
@@ -837,6 +865,22 @@
     }
   }
 
+  function triggerFlash() {
+    flashOverlay.classList.remove("flash-active");
+    // force reflow
+    void flashOverlay.offsetWidth;
+    flashOverlay.classList.add("flash-active");
+  }
+
+  function giveLapFeedback() {
+    // Vibración
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+    // Flash rápido
+    triggerFlash();
+  }
+
   startPauseBtn.addEventListener("click", () => {
     if (!isRunning && startTime === null) {
       startTimer();
@@ -873,16 +917,19 @@
     const segSec = segMs / 1000;
 
     const process = (processInput.value || "").trim() || "Process";
-    const mode = modeSelect.value;
+    const modeValue = modeSelect.value;
 
-    if (mode === "cycle") {
+    if (modeValue === "cycle") {
       addLapRow(process, "CT", round1(segSec), null, round1(segSec));
+      giveLapFeedback();
     } else {
+      // Machine & Load/Unload Time
       if (lapPhase === "T1") {
         tempT1 = segSec;
         lapPhase = "T2";
         setIndicators();
         t1Live.textContent = round1(segSec) + " s";
+        giveLapFeedback();
       } else {
         const t1 = tempT1 != null ? tempT1 : 0;
         const t2 = segSec;
@@ -892,6 +939,7 @@
         lapPhase = "T1";
         setIndicators();
         t2Live.textContent = round1(segSec) + " s";
+        giveLapFeedback();
       }
     }
     startTime = Date.now();
@@ -913,29 +961,34 @@
       tr.appendChild(tdIndex);
 
       const tdProc = document.createElement("td");
-      const procInput = document.createElement("input");
-      procInput.value = lap.process;
-      procInput.addEventListener("change", () => {
-        lap.process = procInput.value.trim();
+      const procInputEl = document.createElement("input");
+      procInputEl.value = lap.process;
+      procInputEl.addEventListener("change", () => {
+        lap.process = procInputEl.value.trim();
         recomputeAll();
       });
-      tdProc.appendChild(procInput);
+      tdProc.appendChild(procInputEl);
       tr.appendChild(tdProc);
 
       const tdMode = document.createElement("td");
-      const modeInput = document.createElement("select");
+      const modeInputEl = document.createElement("select");
       ["CT", "M+L/D"].forEach(m => {
         const opt = document.createElement("option");
         opt.value = m;
         opt.textContent = m;
         if (lap.mode === m) opt.selected = true;
-        modeInput.appendChild(opt);
+        modeInputEl.appendChild(opt);
       });
-      modeInput.addEventListener("change", () => {
-        lap.mode = modeInput.value;
+      modeInputEl.addEventListener("change", () => {
+        lap.mode = modeInputEl.value;
+        if (lap.mode === "CT") {
+          lap.total = lap.t1 || 0;
+        } else {
+          lap.total = (lap.t1 || 0) + (lap.t2 || 0);
+        }
         recomputeAll();
       });
-      tdMode.appendChild(modeInput);
+      tdMode.appendChild(modeInputEl);
       tr.appendChild(tdMode);
 
       const tdStatus = document.createElement("td");
@@ -1028,7 +1081,7 @@
   function recomputeAll() {
     recomputeSummary();
     updateProcessSelectors();
-    updateGraphsAndCapability(); // usa el selector de graph
+    updateGraphsAndCapability();
     updateComplianceSummary();
   }
 
@@ -1058,7 +1111,6 @@
   function recomputeSummary() {
     summaryTableBody.innerHTML = "";
 
-    // group by process + mode, but do not mix CT vs M+L
     const groups = {};
     laps.forEach(lap => {
       if (lap.total == null || lap.total <= 0) return;
@@ -1069,10 +1121,8 @@
 
     const contractPcd = parseFloat(contractPcdInput.value) || null;
     const hoursPerDay = Math.min(Math.max(parseFloat(hoursPerDayInput.value) || 8,1),24);
-    const daysPerWeek = Math.min(Math.max(parseFloat(daysPerWeekInput.value) || 5,1),7);
     const eff = parseFloat(efficiencyInput.value) || 100;
     const effFactor = eff / 100;
-
     const contractPerHour = contractPcd && hoursPerDay ? (contractPcd / hoursPerDay) : null;
 
     Object.keys(groups).forEach(key => {
@@ -1080,7 +1130,20 @@
       const arr = groups[key];
       const N = arr.length;
       const med = median(arr);
-      const cap100 = med ? 3600 / med : null; // pieces/hour
+      const m = mean(arr);
+      const s = stdDev(arr);
+      const LSL = 0;
+      const USL = med ? med * 1.1 : null;
+      let cp = null, cpk = null;
+      if (USL && s && s > 0) {
+        cp = (USL - LSL) / (6 * s);
+        cpk = Math.min(
+          (USL - m) / (3 * s),
+          (m - LSL) / (3 * s)
+        );
+      }
+
+      const cap100 = med ? 3600 / med : null;
       const capEff = cap100 != null ? cap100 * effFactor : null;
       let vsContract = null;
       if (contractPerHour && capEff != null) {
@@ -1104,6 +1167,22 @@
       const tdMed = document.createElement("td");
       tdMed.textContent = med ? med.toFixed(1) : "-";
       tr.appendChild(tdMed);
+
+      const tdMean = document.createElement("td");
+      tdMean.textContent = m ? m.toFixed(2) : "-";
+      tr.appendChild(tdMean);
+
+      const tdSigma = document.createElement("td");
+      tdSigma.textContent = s ? s.toFixed(2) : "-";
+      tr.appendChild(tdSigma);
+
+      const tdCp = document.createElement("td");
+      tdCp.textContent = cp != null ? cp.toFixed(2) : "-";
+      tr.appendChild(tdCp);
+
+      const tdCpk = document.createElement("td");
+      tdCpk.textContent = cpk != null ? cpk.toFixed(2) : "-";
+      tr.appendChild(tdCpk);
 
       const tdCap100 = document.createElement("td");
       tdCap100.textContent = cap100 ? cap100.toFixed(1) : "-";
@@ -1205,7 +1284,6 @@
     const p75 = sorted[Math.floor(0.75*(N-1))];
     const p90 = sorted[Math.floor(0.90*(N-1))];
 
-    // simple Cp/Cpk usando LSL = 0 y USL = 1.1*mediana (target interno)
     const LSL = 0;
     const USL = medVal * 1.1;
     const cp = (USL - LSL) / (6 * (std || 0.0001));
@@ -1300,7 +1378,7 @@
       ctxX.fill();
     });
 
-    // capability curve (normalizada)
+    // capability "bell" (normalizada)
     const ctxC = capCanvas.getContext("2d");
     const w3 = capCanvas.width;
     const h3 = capCanvas.height;
@@ -1325,9 +1403,7 @@
     const contractPcd = parseFloat(contractPcdInput.value) || null;
     const hoursPerDay = Math.min(Math.max(parseFloat(hoursPerDayInput.value) || 8,1),24);
     const eff = parseFloat(efficiencyInput.value) || 100;
-    if (!laps.length) {
-      return;
-    }
+    if (!laps.length) return;
 
     const groups = {};
     laps.forEach(l => {
@@ -1439,7 +1515,6 @@
     copyToClipboard(txt);
   });
 
-  // manual lap
   addManualBtn.addEventListener("click", () => {
     const proc = (processInput.value || "").trim() || "Process";
     const mode = modeSelect.value === "ml" ? "M+L/D" : "CT";
