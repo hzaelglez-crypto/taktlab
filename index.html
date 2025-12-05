@@ -457,7 +457,7 @@
     min-width: 120px;
   }
 
-  /* Summary, capability, etc. */
+  /* Pills */
   .pill {
     border-radius: 999px;
     padding: 3px 8px;
@@ -575,12 +575,13 @@
 
   <!-- MAIN CARDS -->
   <div class="cards">
-    <!-- PROCESS SUMMARY TABLE -->
+    <!-- PROCESS SUMMARY TABLE + STATS -->
     <div class="card">
       <div class="card-header">
         <h2>Process Capacity Overview</h2>
-        <small>Median-based capacity, % vs contract &amp; samples (N)</small>
+        <small>Median CT, capacity and % vs contract per process</small>
       </div>
+
       <div style="overflow-x:auto; max-height:260px;">
         <table id="summaryTable">
           <thead>
@@ -596,6 +597,15 @@
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+
+      <!-- Selector + Cp/Cpk & percentiles justo debajo -->
+      <div class="field" style="margin-top:6px;">
+        <label for="statsProcessSelect">Stats focus (Cp/Cpk &amp; percentiles)</label>
+        <select id="statsProcessSelect"></select>
+      </div>
+      <div id="capabilitySummary" style="margin-top:4px; font-size:0.74rem; color:var(--text-soft);">
+        Select a process to see Cp/Cpk, percentiles and N.
       </div>
 
       <div class="copy-row">
@@ -632,38 +642,46 @@
       </div>
     </div>
 
-    <!-- CAPABILITY & CAPACITY GRAPHS -->
+    <!-- CAPABILITY & GRAPHS (visual only) -->
     <div class="card">
       <div class="card-header">
-        <h2>Capability &amp; Percentile View (per selected process)</h2>
-        <small>Use this as visual support – not as automatic Run@Rate</small>
+        <h2>Distribution & Capability Plots</h2>
+        <small>Visual support for the stats above</small>
       </div>
       <div class="field" style="margin-bottom:6px;">
-        <label for="graphProcessSelect">Select process for graph view</label>
+        <label for="graphProcessSelect">Graph focus</label>
         <select id="graphProcessSelect"></select>
       </div>
       <canvas id="histCanvas"></canvas>
       <canvas id="xbarCanvas"></canvas>
       <canvas id="capCanvas"></canvas>
-
-      <div id="capabilitySummary" style="margin-top:6px; font-size:0.74rem; color:var(--text-soft);">
-        Cp/Cpk and percentile summary will appear here once a process is selected.
-      </div>
     </div>
 
-    <!-- COMPLIANCE SUMMARY TYPE GM -->
+    <!-- CONTRACT vs CAPACITY SUMMARY AS TABLE -->
     <div class="card">
       <div class="card-header">
-        <h2>Compliance Summary (GM-style)</h2>
-        <small>Quick read: contract vs capability</small>
+        <h2>Contract vs Capacity Summary</h2>
+        <small>Median CT, capacity @Eff and verdict vs contract</small>
       </div>
-      <div id="complianceSummary" style="font-size:0.74rem; color:var(--text-soft); display:grid; gap:4px;">
-        <!-- auto filled -->
+      <div style="overflow-x:auto; max-height:260px;">
+        <table id="complianceTable">
+          <thead>
+            <tr>
+              <th>Process</th>
+              <th>Mode</th>
+              <th>CTmed (s)</th>
+              <th>Cap @Eff (pph)</th>
+              <th>% vs contract</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="complianceBody"></tbody>
+        </table>
       </div>
     </div>
 
     <div class="footer-note">
-      Created by Roberto González – TaktLab V3
+      Created by Roberto González
     </div>
   </div>
 </div>
@@ -678,7 +696,7 @@
   let lapPhase = "T1"; // for M+L/D
   let tempT1 = null;
 
-  // DOM
+  // DOM references
   const displayEl = document.getElementById("stopwatchDisplay");
   const startPauseBtn = document.getElementById("startPauseBtn");
   const lapBtn = document.getElementById("lapBtn");
@@ -687,6 +705,7 @@
   const lapsTableBody = document.querySelector("#lapsTable tbody");
   const summaryTableBody = document.querySelector("#summaryTable tbody");
   const graphProcessSelect = document.getElementById("graphProcessSelect");
+  const statsProcessSelect = document.getElementById("statsProcessSelect");
   const contractPcdInput = document.getElementById("contractPcd");
   const hoursPerDayInput = document.getElementById("hoursPerDay");
   const daysPerWeekInput = document.getElementById("daysPerWeek");
@@ -700,7 +719,7 @@
   const addManualBtn = document.getElementById("addManualBtn");
   const resetBtn = document.getElementById("resetBtn");
   const capabilitySummary = document.getElementById("capabilitySummary");
-  const complianceSummary = document.getElementById("complianceSummary");
+  const complianceBody = document.getElementById("complianceBody");
 
   const histCanvas = document.getElementById("histCanvas");
   const xbarCanvas = document.getElementById("xbarCanvas");
@@ -756,6 +775,7 @@
     lastSegStart = Date.now();
     isRunning = true;
     startPauseBtn.textContent = "Pause";
+    setIndicators();
     timerInterval = setInterval(updateDisplay, 50);
   }
 
@@ -766,6 +786,11 @@
     startPauseBtn.textContent = "Start";
     elapsedBeforePause = 0;
     lastSegStart = null;
+    // detener el giro de los aros
+    t1Indicator.classList.remove("active");
+    t2Indicator.classList.remove("active");
+    t1Indicator.classList.add("waiting");
+    t2Indicator.classList.add("waiting");
   }
 
   function resetTimerState() {
@@ -787,11 +812,14 @@
   }
 
   function setIndicators() {
-    if (modeSelect.value !== "ml") {
+    if (!isRunning || modeSelect.value !== "ml") {
       t1Indicator.classList.add("waiting");
       t1Indicator.classList.remove("active");
       t2Indicator.classList.add("waiting");
       t2Indicator.classList.remove("active");
+      if (!isRunning) return;
+    }
+    if (modeSelect.value !== "ml") {
       t1Live.textContent = "n/a";
       t2Live.textContent = "n/a";
       return;
@@ -840,7 +868,7 @@
     if (!isRunning || lastSegStart === null) return;
     const now = Date.now();
     let segMs = now - lastSegStart;
-    if (segMs < 150) return; // avoid ghosts
+    if (segMs < 150) return; // evitar fantasmas
     lastSegStart = now;
     const segSec = segMs / 1000;
 
@@ -848,10 +876,8 @@
     const mode = modeSelect.value;
 
     if (mode === "cycle") {
-      // Single segment = total
       addLapRow(process, "CT", round1(segSec), null, round1(segSec));
     } else {
-      // Machine & Load/Unload: 2 segments
       if (lapPhase === "T1") {
         tempT1 = segSec;
         lapPhase = "T2";
@@ -868,7 +894,6 @@
         t2Live.textContent = round1(segSec) + " s";
       }
     }
-    // reset display segment
     startTime = Date.now();
     elapsedBeforePause = 0;
     displayEl.textContent = "00:00.00";
@@ -1002,8 +1027,8 @@
   // --- Stats and capacity ---
   function recomputeAll() {
     recomputeSummary();
-    updateGraphProcessSelect();
-    updateGraphsAndCapability();
+    updateProcessSelectors();
+    updateGraphsAndCapability(); // usa el selector de graph
     updateComplianceSummary();
   }
 
@@ -1108,38 +1133,107 @@
     });
   }
 
-  function updateGraphProcessSelect() {
+  function updateProcessSelectors() {
     const keys = new Set();
     laps.forEach(l => {
       if (l.total && l.total > 0) {
         keys.add(l.process + "||" + l.mode);
       }
     });
-    const prev = graphProcessSelect.value;
+
+    const prevGraph = graphProcessSelect.value;
+    const prevStats = statsProcessSelect.value;
+
     graphProcessSelect.innerHTML = "";
+    statsProcessSelect.innerHTML = "";
+
     keys.forEach(k => {
-      const opt = document.createElement("option");
       const [proc, mode] = k.split("||");
-      opt.value = k;
-      opt.textContent = proc + " (" + mode + ")";
-      graphProcessSelect.appendChild(opt);
+      const label = proc + " (" + mode + ")";
+      const opt1 = document.createElement("option");
+      opt1.value = k;
+      opt1.textContent = label;
+      graphProcessSelect.appendChild(opt1);
+
+      const opt2 = document.createElement("option");
+      opt2.value = k;
+      opt2.textContent = label;
+      statsProcessSelect.appendChild(opt2);
     });
+
     if (graphProcessSelect.options.length) {
-      const found = Array.from(graphProcessSelect.options).some(o => o.value === prev);
-      if (found) graphProcessSelect.value = prev;
+      const foundG = Array.from(graphProcessSelect.options).some(o => o.value === prevGraph);
+      if (foundG) graphProcessSelect.value = prevGraph;
     }
+
+    if (statsProcessSelect.options.length) {
+      const foundS = Array.from(statsProcessSelect.options).some(o => o.value === prevStats);
+      if (foundS) statsProcessSelect.value = prevStats;
+    }
+
+    updateStatsPanel();
+  }
+
+  statsProcessSelect.addEventListener("change", updateStatsPanel);
+
+  function getProcessDataByKey(key) {
+    if (!key) return [];
+    return laps.filter(l => (l.process + "||" + l.mode) === key && l.total && l.total > 0)
+               .map(l => l.total);
+  }
+
+  function updateStatsPanel() {
+    const key = statsProcessSelect.value;
+    if (!key) {
+      capabilitySummary.textContent = "Select a process to see Cp/Cpk, percentiles and N.";
+      return;
+    }
+    const data = getProcessDataByKey(key);
+    if (!data.length) {
+      capabilitySummary.textContent = "No valid data for this process yet.";
+      return;
+    }
+
+    const sorted = [...data].sort((a,b)=>a-b);
+    const N = sorted.length;
+    const meanVal = mean(sorted);
+    const medVal = median(sorted);
+    const std = stdDev(sorted) || 0.0001;
+    const p10 = sorted[Math.floor(0.10*(N-1))];
+    const p25 = sorted[Math.floor(0.25*(N-1))];
+    const p50 = medVal;
+    const p75 = sorted[Math.floor(0.75*(N-1))];
+    const p90 = sorted[Math.floor(0.90*(N-1))];
+
+    // simple Cp/Cpk usando LSL = 0 y USL = 1.1*mediana (target interno)
+    const LSL = 0;
+    const USL = medVal * 1.1;
+    const cp = (USL - LSL) / (6 * (std || 0.0001));
+    const cpk = Math.min(
+      (USL - meanVal)/(3*std || 0.0001),
+      (meanVal-LSL)/(3*std || 0.0001)
+    );
+
+    let verdict;
+    if (cp >= 1.33 && cpk >= 1.33) {
+      verdict = "Process capable vs internal target.";
+    } else if (cp >= 1.0 && cpk >= 1.0) {
+      verdict = "Borderline capable – keep improving.";
+    } else {
+      verdict = "Process currently not capable – focus here.";
+    }
+
+    capabilitySummary.innerHTML =
+      `<span><strong>N:</strong> ${N}</span><br/>
+       <span><strong>Mean / Median:</strong> ${meanVal.toFixed(2)} s / ${medVal.toFixed(2)} s</span><br/>
+       <span><strong>P10 / P25 / P50 / P75 / P90:</strong> ${p10.toFixed(2)} / ${p25.toFixed(2)} / ${p50.toFixed(2)} / ${p75.toFixed(2)} / ${p90.toFixed(2)} s</span><br/>
+       <span><strong>Cp:</strong> ${cp.toFixed(2)} | <strong>Cpk:</strong> ${cpk.toFixed(2)}</span><br/>
+       <span>${verdict}</span>`;
   }
 
   graphProcessSelect.addEventListener("change", () => {
     updateGraphsAndCapability();
   });
-
-  function getSelectedProcessData() {
-    const key = graphProcessSelect.value;
-    if (!key) return [];
-    return laps.filter(l => (l.process + "||" + l.mode) === key && l.total && l.total > 0)
-               .map(l => l.total);
-  }
 
   function clearCanvas(canvas) {
     const ctx = canvas.getContext("2d");
@@ -1147,15 +1241,13 @@
   }
 
   function updateGraphsAndCapability() {
-    const data = getSelectedProcessData();
+    const key = graphProcessSelect.value;
+    const data = getProcessDataByKey(key);
     clearCanvas(histCanvas);
     clearCanvas(xbarCanvas);
     clearCanvas(capCanvas);
 
-    if (!data.length) {
-      capabilitySummary.textContent = "Cp/Cpk and percentiles will appear once data is available for the selected process.";
-      return;
-    }
+    if (!data.length) return;
 
     // histogram
     const ctxH = histCanvas.getContext("2d");
@@ -1182,7 +1274,7 @@
       ctxH.fillRect(i*barW + 4, h - barH - 10, barW - 8, barH);
     });
 
-    // Xbar like scatter
+    // Xbar-like scatter
     const ctxX = xbarCanvas.getContext("2d");
     const w2 = xbarCanvas.width;
     const h2 = xbarCanvas.height;
@@ -1195,26 +1287,26 @@
     ctxX.stroke();
 
     const meanVal = mean(data);
-    const medVal = median(data);
-    const std = stdDev(data) || 0.0001;
+    const min2 = Math.min(...data);
+    const max2 = Math.max(...data);
+    const range2 = max2 - min2 || 1;
 
     ctxX.fillStyle = "#4ade80";
     data.forEach((v,i) => {
       const x = 20 + (i/(data.length-1 || 1))*(w2-40);
-      const y = h2 - ((v - min)/range)*(h2-20) - 10;
+      const y = h2 - ((v - min2)/range2)*(h2-20) - 10;
       ctxX.beginPath();
       ctxX.arc(x,y,3,0,Math.PI*2);
       ctxX.fill();
     });
 
-    // capability simple: show spec vs distribution
+    // capability curve (normalizada)
     const ctxC = capCanvas.getContext("2d");
     const w3 = capCanvas.width;
     const h3 = capCanvas.height;
     ctxC.fillStyle = "#050c1a";
     ctxC.fillRect(0,0,w3,h3);
 
-    const ctTarget = null; // if later you define CT target spec, you can draw LSL/USL
     ctxC.strokeStyle = "#4ade80";
     ctxC.beginPath();
     ctxC.moveTo(20,h3-20);
@@ -1226,44 +1318,14 @@
       ctxC.lineTo(x,y);
     }
     ctxC.stroke();
-
-    // percentiles
-    const sorted = [...data].sort((a,b)=>a-b);
-    const p10 = sorted[Math.floor(0.10*(sorted.length-1))];
-    const p50 = medVal;
-    const p90 = sorted[Math.floor(0.90*(sorted.length-1))];
-
-    // simple Cp/Cpk vs CTtarget if we infer spec from median
-    const ctTargetGuess = medVal * 1.1;
-    const LSL = 0;
-    const USL = ctTargetGuess;
-    const cp = (USL - LSL) / (6 * (std || 0.0001));
-    const cpk = Math.min((USL - meanVal)/(3*std || 0.0001),(meanVal-LSL)/(3*std || 0.0001));
-
-    let verdict;
-    if (cp >= 1.33 && cpk >= 1.33) {
-      verdict = "Process capable vs internal target.";
-    } else if (cp >= 1.0 && cpk >= 1.0) {
-      verdict = "Borderline capable – keep improving.";
-    } else {
-      verdict = "Process currently not capable – focus here.";
-    }
-
-    capabilitySummary.innerHTML =
-      `<span>Samples (N): <strong>${data.length}</strong></span><br/>
-       <span>Mean: <strong>${meanVal.toFixed(2)} s</strong> | Median: <strong>${medVal.toFixed(2)} s</strong></span><br/>
-       <span>P10 / P50 / P90: <strong>${p10.toFixed(2)} / ${p50.toFixed(2)} / ${p90.toFixed(2)} s</strong></span><br/>
-       <span>Cp: <strong>${cp.toFixed(2)}</strong> | Cpk: <strong>${cpk.toFixed(2)}</strong></span><br/>
-       <span>${verdict}</span>`;
   }
 
   function updateComplianceSummary() {
-    complianceSummary.innerHTML = "";
+    complianceBody.innerHTML = "";
     const contractPcd = parseFloat(contractPcdInput.value) || null;
     const hoursPerDay = Math.min(Math.max(parseFloat(hoursPerDayInput.value) || 8,1),24);
     const eff = parseFloat(efficiencyInput.value) || 100;
     if (!laps.length) {
-      complianceSummary.textContent = "Add cycle-time samples to see a GM-style contract vs capability summary.";
       return;
     }
 
@@ -1289,29 +1351,48 @@
         vs = (capEff / contractPerHour) * 100;
       }
 
-      const div = document.createElement("div");
-      const tag = vs != null ? vs.toFixed(0)+"%" : "n/a";
-      let colorClass = "pill";
-      let shortVerdict = "";
+      const tr = document.createElement("tr");
+
+      const tdProc = document.createElement("td");
+      tdProc.textContent = proc;
+      tr.appendChild(tdProc);
+
+      const tdMode = document.createElement("td");
+      tdMode.textContent = mode;
+      tr.appendChild(tdMode);
+
+      const tdMed = document.createElement("td");
+      tdMed.textContent = medCT ? medCT.toFixed(2) : "-";
+      tr.appendChild(tdMed);
+
+      const tdCap = document.createElement("td");
+      tdCap.textContent = capEff ? capEff.toFixed(1) : "-";
+      tr.appendChild(tdCap);
+
+      const tdVs = document.createElement("td");
+      const tdVerdict = document.createElement("td");
+
       if (vs != null) {
+        const pctStr = vs.toFixed(0) + "%";
+        tdVs.textContent = pctStr;
         if (vs > 105) {
-          colorClass = "pill pill-ok";
-          shortVerdict = "Capable vs contract.";
+          tdVs.classList.add("tag-good");
+          tdVerdict.textContent = "Capable vs contract";
         } else if (vs >= 85 && vs <= 105) {
-          colorClass = "pill pill-bad";
-          shortVerdict = "At risk – close to contract.";
+          tdVs.classList.add("tag-warn");
+          tdVerdict.textContent = "At risk – close to contract";
         } else {
-          colorClass = "pill pill-bad";
-          shortVerdict = "Not capable vs contract.";
+          tdVs.classList.add("tag-bad");
+          tdVerdict.textContent = "Not capable vs contract";
         }
+      } else {
+        tdVs.textContent = "-";
+        tdVerdict.textContent = "";
       }
 
-      div.innerHTML =
-        `<strong>${proc} (${mode})</strong> – median CT <strong>${medCT.toFixed(2)} s</strong>, ` +
-        `capacity @Eff ≈ <strong>${capEff ? capEff.toFixed(1) : "n/a"} pph</strong> ` +
-        (vs != null ? `(<span class="${colorClass}">${tag} vs contract</span>)` : "") +
-        `<br/><span>${shortVerdict}</span>`;
-      complianceSummary.appendChild(div);
+      tr.appendChild(tdVs);
+      tr.appendChild(tdVerdict);
+      complianceBody.appendChild(tr);
     });
   }
 
@@ -1322,7 +1403,6 @@
         await navigator.clipboard.writeText(text);
         alert("Data copied to clipboard.");
       } else {
-        // fallback
         const ta = document.createElement("textarea");
         ta.value = text;
         ta.style.position = "fixed";
@@ -1378,7 +1458,6 @@
     resetTimerState();
   });
 
-  // keep indicators consistent with mode
   modeSelect.addEventListener("change", () => {
     setIndicators();
   });
