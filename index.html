@@ -1,10 +1,12 @@
+from textwrap import dedent
+
+html_content = dedent("""\
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>TaktLab – Time Study Stopwatch</title>
-
 <style>
 :root{
   --c1:#0A192F;
@@ -138,7 +140,7 @@ body{
   gap:10px;
   justify-content:center;
   flex-wrap:wrap;
-  margin-bottom:14px;
+  margin-bottom:10px;
 }
 button{
   border:none;
@@ -168,6 +170,55 @@ button:active{ transform:scale(.96); }
   padding:15px 40px;
   font-weight:800;
   box-shadow:0 0 0 3px rgba(245,127,23,.35);
+}
+
+/* DUAL INDICATOR T1/T2 */
+.dualIndic{
+  display:none;
+  justify-content:center;
+  gap:22px;
+  margin-bottom:12px;
+}
+.phase{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  font-size:.75rem;
+  color:var(--t2);
+}
+.phaseRing{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  border:3px solid #374151;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+.phaseLabel{
+  font-size:.8rem;
+}
+.phaseStatus{
+  margin-top:4px;
+  font-size:.7rem;
+}
+.phase.active .phaseRing{
+  border-color:var(--c3);
+  box-shadow:0 0 9px rgba(245,127,23,.6);
+  animation:spinPhase 1s linear infinite;
+}
+.phase.done .phaseRing{
+  border-color:var(--c4);
+  box-shadow:0 0 6px rgba(0,200,83,.7);
+}
+.phase.waiting .phaseRing{
+  border-color:#4B5563;
+  opacity:0.8;
+}
+@keyframes spinPhase{
+  from{ transform:rotate(0deg); }
+  to{ transform:rotate(360deg); }
 }
 
 /* COPY BAR (STICKY ABOVE LAP TABLE) */
@@ -446,9 +497,7 @@ canvas{
 </style>
 </head>
 <body>
-
 <div class="app">
-
   <div class="topBar">
     <!-- LOGO + TITULOS -->
     <div class="headerRow">
@@ -485,6 +534,18 @@ canvas{
     <div class="btns">
       <button id="btnStartPause" class="sp">Start</button>
       <button id="btnLap" class="lp">LAP</button>
+    </div>
+
+    <!-- DUAL INDICATOR T1/T2 -->
+    <div id="dualIndicator" class="dualIndic">
+      <div id="phaseT1" class="phase waiting">
+        <div class="phaseRing"><div class="phaseLabel" id="phaseT1Label">T1</div></div>
+        <div class="phaseStatus" id="phaseT1Status">Waiting T1</div>
+      </div>
+      <div id="phaseT2" class="phase waiting">
+        <div class="phaseRing"><div class="phaseLabel" id="phaseT2Label">T2</div></div>
+        <div class="phaseStatus" id="phaseT2Status">Waiting T2</div>
+      </div>
     </div>
   </div>
 
@@ -588,8 +649,10 @@ canvas{
       <thead>
         <tr>
           <th>Proc</th>
+          <th>N</th>
           <th>CTmed (s)</th>
-          <th>Cap</th>
+          <th>Cap100</th>
+          <th>CapEff</th>
           <th>% vs contract</th>
         </tr>
       </thead>
@@ -734,24 +797,32 @@ const ctxScatter    = canvasScatter.getContext("2d");
 const ctxHist       = canvasHist.getContext("2d");
 const ctxBox        = canvasBox.getContext("2d");
 
-// DATA
+// T1/T2 indicator elements
+const dualIndicator = document.getElementById("dualIndicator");
+const phaseT1       = document.getElementById("phaseT1");
+const phaseT2       = document.getElementById("phaseT2");
+const phaseT1Status = document.getElementById("phaseT1Status");
+const phaseT2Status = document.getElementById("phaseT2Status");
+
 let cycles   = [];   // {idx, process, mode, status, note, t1, t2, source}
 let partialT1 = null;
 let activeProcess = null;
 
 // ============== UTILS ==============
-function fmt(ms){
+function formatTime(ms){
   if(!ms) return "00:00.00";
-  let s  = ms / 1000;
-  let m  = Math.floor(s / 60);
-  let sec= Math.floor(s % 60);
-  let cs = Math.floor((s - sec) * 100);
-  return `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}.${String(cs).padStart(2,"0")}`;
+  let totalSec = ms / 1000;
+  let min = Math.floor(totalSec / 60);
+  let sec = (totalSec % 60).toFixed(2);
+  return (
+    String(min).padStart(2,"0") + ":" +
+    sec.toString().padStart(5,"0")
+  );
 }
 function toSec(ms){ return ms ? ms / 1000 : 0; }
 function tick(){
   elapsed = Date.now() - startTime;
-  display.textContent = fmt(elapsed);
+  display.textContent = formatTime(elapsed);
 }
 function vib(){
   if(navigator.vibrate) navigator.vibrate(40);
@@ -800,6 +871,41 @@ function fallbackCopyText(str){
   document.body.removeChild(ta);
 }
 
+// ============== T1/T2 INDICATOR ==============
+function updateDualIndicator(){
+  if(modeSel.value !== "Machine & Load/Unload Time"){
+    dualIndicator.style.display = "none";
+    return;
+  }
+  dualIndicator.style.display = "flex";
+
+  // reset classes
+  phaseT1.classList.remove("active","done","waiting");
+  phaseT2.classList.remove("active","done","waiting");
+
+  if(!running && partialT1 === null){
+    phaseT1.classList.add("waiting");
+    phaseT2.classList.add("waiting");
+    phaseT1Status.textContent = "Waiting T1";
+    phaseT2Status.textContent = "Waiting T2";
+  }else if(running && partialT1 === null){
+    phaseT1.classList.add("active");
+    phaseT2.classList.add("waiting");
+    phaseT1Status.textContent = "T1 running";
+    phaseT2Status.textContent = "Waiting T2";
+  }else if(partialT1 !== null && running){
+    phaseT1.classList.add("done");
+    phaseT2.classList.add("active");
+    phaseT1Status.textContent = "T1 done";
+    phaseT2Status.textContent = "T2 running";
+  }else if(partialT1 !== null && !running){
+    phaseT1.classList.add("done");
+    phaseT2.classList.add("waiting");
+    phaseT1Status.textContent = "T1 done";
+    phaseT2Status.textContent = "T2 paused";
+  }
+}
+
 // ============== START / PAUSE / RESET ==============
 btnSP.onclick = () => {
   if(!running){
@@ -817,6 +923,7 @@ btnSP.onclick = () => {
     clearInterval(timer);
     tick();
   }
+  updateDualIndicator();
 };
 
 btnReset.onclick = () => {
@@ -830,6 +937,7 @@ btnReset.onclick = () => {
   activeProcess = null;
   app.classList.remove("running");
   fullRefresh();
+  updateDualIndicator();
 };
 
 // ============== LAP ==============
@@ -837,9 +945,12 @@ btnLap.onclick = () => {
   if(!running) return;
   vib();
 
+  let now = Date.now();
+  let t = now - startTime;
+  if(t < 150) return; // evitar laps fantasma muy rápidos
+
   let proc = processInput.value.trim() || "NoName";
   let mode = modeSel.value;
-  let t    = Date.now() - startTime; // ms
 
   if(mode === "Cycle Time"){
     cycles.push({
@@ -862,11 +973,13 @@ btnLap.onclick = () => {
 
   // Machine & Load / Unload
   if(partialT1 === null){
+    // Cierre de T1
     partialT1 = t;
     startTime = Date.now();
     elapsed = 0;
     display.textContent = "00:00.00";
   }else{
+    // Cierre de T2 y registro del par
     cycles.push({
       idx:     cycles.length + 1,
       process: proc,
@@ -884,6 +997,7 @@ btnLap.onclick = () => {
     display.textContent = "00:00.00";
     fullRefresh();
   }
+  updateDualIndicator();
 };
 
 // ============== ADD MANUAL LAP ==============
@@ -923,6 +1037,7 @@ btnAddManual.onclick = () => {
 
   activeProcess = proc;
   fullRefresh();
+  updateDualIndicator();
 };
 
 // ============== RENDER LAPS TABLE ==============
@@ -988,6 +1103,7 @@ function delLap(id){
   cycles = cycles.filter(c => c.idx !== id);
   cycles.forEach((c,i)=> c.idx = i+1);
   fullRefresh();
+  updateDualIndicator();
 }
 
 // ============== SUMMARY BY PROCESS ==============
@@ -1042,7 +1158,7 @@ function renderProcessCapacity(){
   cycles.forEach(c => {
     if(!map[c.process]) map[c.process] = [];
     let tot = toSec((c.t1||0)+(c.t2||0));
-    map[c.process].push(tot);
+    if(tot>0) map[c.process].push(tot);
   });
 
   let pcd = parseFloat(sdcInput.value) || 0;
@@ -1055,28 +1171,34 @@ function renderProcessCapacity(){
 
   for(let p in map){
     let arr = map[p];
+    if(!arr.length) continue;
     let med = median(arr);
-    let capReal = 0;
-    let capAdj  = 0;
-    let capNeeded = 0;
-    let ratio = 0;
+    let N   = arr.length;
 
-    let hoursFactor = hrs * (view === "day" ? 1 : dpm || 0);
+    // capacidad 100% y con eficiencia (según vista day/week)
+    let hoursFactor = hrs * (view === "day" ? 1 : (dpm || 0));
+    let cap100 = 0;
+    let capEff = 0;
     if(hoursFactor>0 && med>0){
-      capReal = (hoursFactor * 3600) / med;
-      capAdj  = capReal * effFactor;
+      cap100 = (hoursFactor * 3600) / med;
+      capEff = cap100 * effFactor;
     }
 
-    if(pcd>0 && hrs>0 && dpm>0){
-      capNeeded = (view === "day" ? pcd : pcd*dpm);
-      ratio = capNeeded>0 ? (capAdj/capNeeded) : 0;
-    }
+    // contrato
+    let capNeeded = (pcd>0 && dpm>0)
+      ? (view === "day" ? pcd : pcd * dpm)
+      : 0;
+    let ratio = (capNeeded>0 && capEff>0)
+      ? (capEff / capNeeded)
+      : 0;
 
     let tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p}</td>
+      <td>${N}</td>
       <td>${med.toFixed(1)}</td>
-      <td>${capAdj ? capAdj.toFixed(0) : "-"}</td>
+      <td>${cap100 ? cap100.toFixed(0) : "-"}</td>
+      <td>${capEff ? capEff.toFixed(0) : "-"}</td>
       <td>${ratio ? (ratio*100).toFixed(0)+"%" : "-"}</td>
     `;
     if(ratio){
@@ -1114,7 +1236,7 @@ function renderCompliance(){
   let capNeeded = (pcd>0 && dpm>0) ? (view==="day"?pcd:pcd*dpm) : 0;
   let ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
 
-  let hoursFactor = hrs * (view==="day"?1:dpm||0);
+  let hoursFactor = hrs * (view==="day"?1:(dpm||0));
   let capReal = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
   let capAdj  = capReal * effFactor;
   let capRatio  = (capNeeded>0 && capAdj>0) ? (capAdj/capNeeded)*100 : 0;
@@ -1125,9 +1247,9 @@ function renderCompliance(){
   let cpk = (stdv>0 && ctTarget>0) ? Math.min((usl-avg)/(3*stdv),(avg-lsl)/(3*stdv)) : 0;
 
   function st(x){
-    if(x==="good") return `<span style="color:#00C853;font-weight:700;">GOOD</span>`;
-    if(x==="warn") return `<span style="color:#FBC02D;font-weight:700;">WARN</span>`;
-    return `<span style="color:#D50000;font-weight:700;">BAD</span>`;
+    if(x==="good") return '<span style="color:#00C853;font-weight:700;">GOOD</span>';
+    if(x==="warn") return '<span style="color:#FBC02D;font-weight:700;">WARN</span>';
+    return '<span style="color:#D50000;font-weight:700;">BAD</span>';
   }
 
   let rows = [];
@@ -1139,9 +1261,11 @@ function renderCompliance(){
       <td>${ctMed.toFixed(1)}s</td>
       <td>${ctTarget ? ctRatio.toFixed(0)+"%" : "-"}</td>
       <td>
-        ${ ctTarget ?
-           (ctRatio<=85 ? st("good") : ctRatio<=100 ? st("warn") : st("bad"))
-           : "-" }
+        ${
+          ctTarget
+          ? (ctRatio<=85 ? st("good") : ctRatio<=100 ? st("warn") : st("bad"))
+          : "-"
+        }
       </td>
     </tr>
   `);
@@ -1152,9 +1276,11 @@ function renderCompliance(){
       <td>${capAdj ? capAdj.toFixed(0) : "-"}</td>
       <td>${capNeeded ? capRatio.toFixed(0)+"%" : "-"}</td>
       <td>
-        ${ capNeeded ?
-           (capRatio>=100 ? st("good") : capRatio>=85 ? st("warn") : st("bad"))
-           : "-" }
+        ${
+          capNeeded
+          ? (capRatio>=100 ? st("good") : capRatio>=85 ? st("warn") : st("bad"))
+          : "-"
+        }
       </td>
     </tr>
   `);
@@ -1174,9 +1300,11 @@ function renderCompliance(){
       <td>${ctTarget ? cpk.toFixed(2) : "-"}</td>
       <td>-</td>
       <td>
-        ${ ctTarget ?
-           (cpk>=1.33 ? st("good") : cpk>=1.00 ? st("warn") : st("bad"))
-           : "-" }
+        ${
+          ctTarget
+          ? (cpk>=1.33 ? st("good") : cpk>=1.00 ? st("warn") : st("bad"))
+          : "-"
+        }
       </td>
     </tr>
   `);
@@ -1185,8 +1313,6 @@ function renderCompliance(){
 }
 
 // ============== GRAPHS (Sixpack-style light) ==============
-
-// devuelve array CT en segundos del proceso activo
 function getCTArrayForActive(){
   if(!activeProcess) return [];
   return cycles
@@ -1431,8 +1557,8 @@ function drawCapabilityMini(mean, sd, lsl, usl, cp, cpk, p10, p50, p90){
   ctx.fillStyle = "#E5E5E5";
   ctx.font = "10px sans-serif";
   ctx.fillText("Capability Plot (approx.)", padX, 20);
-  ctx.fillText(`Mean: ${mean.toFixed(2)}s`, padX, 36);
-  ctx.fillText(`Cp: ${cp.toFixed(2)} | Cpk: ${cpk.toFixed(2)}`, padX, 52);
+  ctx.fillText("Mean: " + mean.toFixed(2) + "s", padX, 36);
+  ctx.fillText("Cp: " + cp.toFixed(2) + " | Cpk: " + cpk.toFixed(2), padX, 52);
 
   let verdict = "Not capable";
   let color   = "#D50000";
@@ -1441,7 +1567,7 @@ function drawCapabilityMini(mean, sd, lsl, usl, cp, cpk, p10, p50, p90){
 
   ctx.fillStyle = color;
   ctx.font = "11px sans-serif";
-  ctx.fillText(`Verdict: ${verdict}`, padX, 70);
+  ctx.fillText("Verdict: " + verdict, padX, 70);
 
   const qX = padX + 260;
   const qY = 24;
@@ -1455,9 +1581,9 @@ function drawCapabilityMini(mean, sd, lsl, usl, cp, cpk, p10, p50, p90){
   ctx.fillStyle = "#E5E5E5";
   ctx.font = "10px sans-serif";
   ctx.fillText("Percentile View", qX + 10, qY + 14);
-  ctx.fillText(`P10: ${p10.toFixed(1)} s`, qX + 10, qY + 32);
-  ctx.fillText(`P50: ${p50.toFixed(1)} s`, qX + 10, qY + 48);
-  ctx.fillText(`P90: ${p90.toFixed(1)} s`, qX + 10, qY + 64);
+  ctx.fillText("P10: " + p10.toFixed(1) + " s", qX + 10, qY + 32);
+  ctx.fillText("P50: " + p50.toFixed(1) + " s", qX + 10, qY + 48);
+  ctx.fillText("P90: " + p90.toFixed(1) + " s", qX + 10, qY + 64);
 }
 
 // Tabla de stats de las gráficas
@@ -1465,7 +1591,7 @@ function renderGraphStats(s){
   graphStatsBody.innerHTML = "";
   function row(label,val){
     let tr = document.createElement("tr");
-    tr.innerHTML = `<td>${label}</td><td>${val}</td>`;
+    tr.innerHTML = "<td>" + label + "</td><td>" + val + "</td>";
     graphStatsBody.appendChild(tr);
   }
   row("Mean CT (s)", s.mean.toFixed(2));
@@ -1473,13 +1599,13 @@ function renderGraphStats(s){
   row("Std Dev (s)", s.sd.toFixed(2));
   row("CV (%)", s.cv.toFixed(1));
   row("P10 / P50 / P90 (s)",
-      `${s.p10.toFixed(1)} / ${s.p50.toFixed(1)} / ${s.p90.toFixed(1)}`);
+      s.p10.toFixed(1) + " / " + s.p50.toFixed(1) + " / " + s.p90.toFixed(1));
   row("CT Target (contract, s)",
       s.ctTargetContract ? s.ctTargetContract.toFixed(2) : "-");
   row("LSL / USL (s)",
-      `${s.lsl.toFixed(2)} / ${s.usl.toFixed(2)}`);
+      s.lsl.toFixed(2) + " / " + s.usl.toFixed(2));
   row("LCL / UCL (s)",
-      `${s.lcl.toFixed(2)} / ${s.ucl.toFixed(2)}`);
+      s.lcl.toFixed(2) + " / " + s.ucl.toFixed(2));
 }
 
 // ============== PROCESS TABS ============
@@ -1511,7 +1637,7 @@ function recolorRows(ctTarget){
   if(!ctTarget || !activeProcess) return;
   cycles.forEach(c=>{
     if(c.process !== activeProcess) return;
-    let tr = lapsBody.querySelector(`tr[data-idx="${c.idx}"]`);
+    let tr = lapsBody.querySelector('tr[data-idx="' + c.idx + '"]');
     if(!tr) return;
     let total = toSec((c.t1||0)+(c.t2||0));
     if(!total) return;
@@ -1525,7 +1651,6 @@ function recolorRows(ctTarget){
 
 // ============== CAPACITY PANEL (incluye Cap/hora SIEMPRE) ============
 function updateCapacityPanel(){
-  // reset KPIs
   kpiMedian.textContent   = "-";
   kpiCapHr100.textContent = "-";
   kpiCapHrEff.textContent = "-";
@@ -1570,7 +1695,7 @@ function updateCapacityPanel(){
   if(isNaN(eff) || eff<=0) eff = 100;
   let effFactor = eff/100;
 
-  // ====== Capacidad por HORA (independiente de PCD/Horas) ======
+  // Capacidad por HORA (independiente de PCD)
   let capHourReal = ctMed>0 ? 3600/ctMed : 0;
   let capHourAdj  = capHourReal * effFactor;
 
@@ -1578,15 +1703,14 @@ function updateCapacityPanel(){
   kpiCapHr100.textContent = capHourReal ? capHourReal.toFixed(0)+" pcs/h" : "-";
   kpiCapHrEff.textContent = capHourAdj ? capHourAdj.toFixed(0)+" pcs/h" : "-";
 
-  // Mostrar también en texto
   if(capHourReal){
     capActualRow.textContent =
-      `Capacity / hour: ${capHourReal.toFixed(0)} pcs @100% | ${capHourAdj.toFixed(0)} pcs @${eff.toFixed(0)}%`;
+      "Capacity / hour: " + capHourReal.toFixed(0) + " pcs @100% | " +
+      capHourAdj.toFixed(0) + " pcs @" + eff.toFixed(0) + "%";
   }else{
     capActualRow.textContent = "Actual Capacity (calculator): -";
   }
 
-  // ====== Datos de contrato (sólo si hay PCD + horas + días) ======
   let ctTarget = (pcd>0 && hrs>0) ? (hrs*3600)/pcd : 0;
   let capNeeded = 0;
   let ctRatio = 0;
@@ -1597,7 +1721,6 @@ function updateCapacityPanel(){
     capNeeded = (view==="day"?pcd:pcd*dpm);
     ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
 
-    // Capacidad día/semana con median CT
     let hoursFactor = hrs * (view==="day"?1:(dpm||0));
     let capRealDayWeek = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
     let capAdjDayWeek  = capRealDayWeek * effFactor;
@@ -1609,15 +1732,15 @@ function updateCapacityPanel(){
     cpk = stdv>0 ? Math.min((usl-avg)/(3*stdv),(avg-lsl)/(3*stdv)) : 0;
 
     ctTargetRow.textContent =
-      `CT Target (contract): ${ctTarget.toFixed(1)}s`;
+      "CT Target (contract): " + ctTarget.toFixed(1) + "s";
     ctRatioRow.textContent  =
-      `CT Ratio vs Target: ${ctRatio.toFixed(0)}%`;
+      "CT Ratio vs Target: " + ctRatio.toFixed(0) + "%";
     capContractRow.textContent =
-      `Contract Capacity: ${capNeeded.toFixed(0)} pcs/${view}`;
+      "Contract Capacity: " + capNeeded.toFixed(0) + " pcs/" + view;
     capRatioRow.textContent =
-      `Capacity Ratio vs Contract (Adj): ${capRatio.toFixed(0)}%`;
-    cpRow.textContent  = `Cp: ${cp.toFixed(2)}`;
-    cpkRow.textContent = `Cpk: ${cpk.toFixed(2)}`;
+      "Capacity Ratio vs Contract (Adj): " + capRatio.toFixed(0) + "%";
+    cpRow.textContent  = "Cp: " + cp.toFixed(2);
+    cpkRow.textContent = "Cpk: " + cpk.toFixed(2);
 
     let verdict = "";
     if(cpk>=1.33 && cp>=1.33 && capRatio>=100 && ctRatio<=85){
@@ -1641,7 +1764,7 @@ function updateCapacityPanel(){
     recolorRows(0);
   }
 
-  ctMedianRow.textContent = `CT Median: ${ctMed.toFixed(1)}s`;
+  ctMedianRow.textContent = "CT Median: " + ctMed.toFixed(1) + "s";
 }
 
 // ============== COPY ALL (TODOS LOS DATOS) ============
@@ -1668,7 +1791,6 @@ btnCopyAll.onclick = () => {
   let avg   = totals.length ? average(totals) : 0;
   let cv    = avg ? (stdv/avg)*100 : 0;
 
-  // Capacidad por hora SIEMPRE
   let capHourReal = ctMed>0 ? 3600/ctMed : 0;
   let capHourAdj  = capHourReal * effFactor;
 
@@ -1687,39 +1809,39 @@ btnCopyAll.onclick = () => {
   let cpk = (stdv>0 && ctTarget>0) ? Math.min((usl-avg)/(3*stdv),(avg-lsl)/(3*stdv)) : 0;
 
   let txt = "";
-  txt += "======================\n";
-  txt += " TaktLab – Time Study Summary\n";
-  txt += "======================\n\n";
-  txt += `Process focus:\t${headerProc}\n`;
-  txt += `Time Type:\t${modeSel.value}\n\n`;
-  txt += `PCD (day):\t${pcd ? pcd.toFixed(1) : "-"} pcs\n`;
-  txt += `Hours/day:\t${hrs ? hrs.toFixed(1) : "-"} h\n`;
-  txt += `Days/week:\t${dpm || "-"}\n`;
-  txt += `View:\t${view}\n`;
-  txt += `Efficiency:\t${eff.toFixed(0)}%\n\n`;
+  txt += "======================\\n";
+  txt += " TaktLab – Time Study Summary\\n";
+  txt += "======================\\n\\n";
+  txt += "Process focus:\\t" + headerProc + "\\n";
+  txt += "Time Type:\\t" + modeSel.value + "\\n\\n";
+  txt += "PCD (day):\\t" + (pcd ? pcd.toFixed(1) : "-") + " pcs\\n";
+  txt += "Hours/day:\\t" + (hrs ? hrs.toFixed(1) : "-") + " h\\n";
+  txt += "Days/week:\\t" + (dpm || "-") + "\\n";
+  txt += "View:\\t" + view + "\\n";
+  txt += "Efficiency:\\t" + eff.toFixed(0) + "%\\n\\n";
 
   if(ctMed>0){
-    txt += `CT Median:\t${ctMed.toFixed(1)} s\n`;
-    txt += `Std Dev:\t${stdv.toFixed(2)} s\n`;
-    txt += `CV:\t${cv.toFixed(1)}%\n\n`;
-    txt += `Capacity / hour @100%:\t${capHourReal ? capHourReal.toFixed(0) : "-"} pcs/h\n`;
-    txt += `Capacity / hour @${eff.toFixed(0)}%:\t${capHourAdj ? capHourAdj.toFixed(0) : "-"} pcs/h\n`;
-    txt += `Capacity @100% (${view}):\t${capReal ? capReal.toFixed(0) : "-"} pcs\n`;
-    txt += `Capacity @${eff.toFixed(0)}% (${view}):\t${capAdj ? capAdj.toFixed(0) : "-"} pcs\n`;
+    txt += "CT Median:\\t" + ctMed.toFixed(1) + " s\\n";
+    txt += "Std Dev:\\t" + stdv.toFixed(2) + " s\\n";
+    txt += "CV:\\t" + cv.toFixed(1) + "%\\n\\n";
+    txt += "Capacity / hour @100%:\\t" + (capHourReal ? capHourReal.toFixed(0) : "-") + " pcs/h\\n";
+    txt += "Capacity / hour @" + eff.toFixed(0) + "%:\\t" + (capHourAdj ? capHourAdj.toFixed(0) : "-") + " pcs/h\\n";
+    txt += "Capacity @100% (" + view + "):\\t" + (capReal ? capReal.toFixed(0) : "-") + " pcs\\n";
+    txt += "Capacity @" + eff.toFixed(0) + "% (" + view + "):\\t" + (capAdj ? capAdj.toFixed(0) : "-") + " pcs\\n";
     if(ctTarget>0){
-      txt += `CT Target:\t${ctTarget.toFixed(1)} s\n`;
-      txt += `CT Ratio:\t${ctRatio.toFixed(0)}%\n`;
-      txt += `Contract Capacity (${view}):\t${capNeeded ? capNeeded.toFixed(0) : "-"} pcs\n`;
-      txt += `Capacity Ratio (Adj):\t${capRatio ? capRatio.toFixed(0) : "-"}%\n`;
-      txt += `Cp:\t${cp.toFixed(2)}\n`;
-      txt += `Cpk:\t${cpk.toFixed(2)}\n\n`;
+      txt += "CT Target:\\t" + ctTarget.toFixed(1) + " s\\n";
+      txt += "CT Ratio:\\t" + ctRatio.toFixed(0) + "%\\n";
+      txt += "Contract Capacity (" + view + "):\\t" + (capNeeded ? capNeeded.toFixed(0) : "-") + " pcs\\n";
+      txt += "Capacity Ratio (Adj):\\t" + (capRatio ? capRatio.toFixed(0) : "-") + "%\\n";
+      txt += "Cp:\\t" + cp.toFixed(2) + "\\n";
+      txt += "Cpk:\\t" + cpk.toFixed(2) + "\\n\\n";
     }
   }
 
-  txt += "----------------------\n";
-  txt += "LAPS DATA (tabular – all processes)\n";
-  txt += "----------------------\n";
-  txt += "#\tProcess\tMode\tStatus\tNote\tT1 (s)\tT2 (s)\tTotal (s)\n";
+  txt += "----------------------\\n";
+  txt += "LAPS DATA (tabular – all processes)\\n";
+  txt += "----------------------\\n";
+  txt += "#\\tProcess\\tMode\\tStatus\\tNote\\tT1 (s)\\tT2 (s)\\tTotal (s)\\n";
 
   cycles.forEach(c=>{
     let total = toSec((c.t1||0)+(c.t2||0));
@@ -1728,11 +1850,11 @@ btnCopyAll.onclick = () => {
       c.process,
       c.mode,
       c.status || "",
-      (c.note||"").replace(/\t/g," "),
+      (c.note||"").replace(/\\t/g," "),
       c.t1 ? toSec(c.t1).toFixed(1) : "-",
       c.t2 ? toSec(c.t2).toFixed(1) : "-",
       total ? total.toFixed(1) : "-"
-    ].join("\t") + "\n";
+    ].join("\\t") + "\\n";
   });
 
   if(navigator.clipboard && window.isSecureContext){
@@ -1796,26 +1918,26 @@ btnCopySummary.onclick = () => {
   let worst = rows[0];
 
   let txt = "";
-  txt += "======================\n";
-  txt += " TaktLab – Process Capacity Ranking\n";
-  txt += "======================\n\n";
-  txt += `PCD (day):\t${pcd ? pcd.toFixed(1) : "-"} pcs\n`;
-  txt += `Hours/day:\t${hrs.toFixed(1)} h\n`;
-  txt += `Days/week:\t${dpm}\n`;
-  txt += `View:\t${view}\n`;
-  txt += `Efficiency:\t${eff.toFixed(0)}%\n\n`;
-  txt += "Process\tCTmed (s)\tCapacity (Adj)\t% vs contract\n";
+  txt += "======================\\n";
+  txt += " TaktLab – Process Capacity Ranking\\n";
+  txt += "======================\\n\\n";
+  txt += "PCD (day):\\t" + (pcd ? pcd.toFixed(1) : "-") + " pcs\\n";
+  txt += "Hours/day:\\t" + hrs.toFixed(1) + " h\\n";
+  txt += "Days/week:\\t" + dpm + "\\n";
+  txt += "View:\\t" + view + "\\n";
+  txt += "Efficiency:\\t" + eff.toFixed(0) + "%\\n\\n";
+  txt += "Process\\tCTmed (s)\\tCapacity (Adj)\\t% vs contract\\n";
   rows.forEach(r=>{
     txt += [
       r.proc,
       r.ctmed.toFixed(1),
       r.cap.toFixed(0) + " pcs/" + view,
       capNeeded ? r.ratio.toFixed(0) + "%" : "-"
-    ].join("\t") + "\n";
+    ].join("\\t") + "\\n";
   });
-  txt += "\nBottleneck:\t" + worst.proc +
-         "\t" + worst.cap.toFixed(0) + " pcs/" + view +
-         "\t" + (capNeeded ? worst.ratio.toFixed(0) + "%" : "-") + "\n";
+  txt += "\\nBottleneck:\\t" + worst.proc +
+         "\\t" + worst.cap.toFixed(0) + " pcs/" + view +
+         "\\t" + (capNeeded ? worst.ratio.toFixed(0) + "%" : "-") + "\\n";
 
   if(navigator.clipboard && window.isSecureContext){
     navigator.clipboard.writeText(txt)
@@ -1834,7 +1956,11 @@ processInput.addEventListener("input", ()=>{
   activeProcess = processInput.value.trim() || null;
   fullRefresh();
 });
-modeSel.addEventListener("change", fullRefresh);
+modeSel.addEventListener("change", ()=>{
+  partialT1 = null;
+  fullRefresh();
+  updateDualIndicator();
+});
 
 function fullRefresh(){
   renderLaps();
@@ -1844,6 +1970,7 @@ function fullRefresh(){
   renderCompliance();
   updateCapacityPanel();
   drawAllGraphs();
+  updateDualIndicator();
 }
 
 // INIT
@@ -1851,3 +1978,10 @@ fullRefresh();
 </script>
 </body>
 </html>
+""")
+
+file_path = "/mnt/data/taktlab_v3.html"
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+file_path
