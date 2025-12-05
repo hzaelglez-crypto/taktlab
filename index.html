@@ -169,15 +169,35 @@ button:active{ transform:scale(.96); }
   font-weight:800;
   box-shadow:0 0 0 3px rgba(245,127,23,.35);
 }
-.rs{ background:var(--c5); }
-.sec{ background:#0288D1; }
 
+/* COPY BAR (STICKY ABOVE LAP TABLE) */
+.copyBar{
+  position:sticky;
+  top:60px;
+  z-index:90;
+  background:var(--c2);
+  padding:8px 4px;
+  margin:10px 0;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  border-top:1px solid var(--b1);
+  border-bottom:1px solid var(--b1);
+}
 .copyBtn{
   background:#263859;
   border:1px solid #3A4F7A;
   font-weight:700;
-  padding:14px 18px;
-  border-radius:12px;
+  padding:10px 14px;
+  border-radius:10px;
+}
+.smallBtn{
+  background:#374151;
+  border:1px solid #4B5563;
+  padding:9px 12px;
+  font-size:.78rem;
+  border-radius:9px;
 }
 
 /* INPUT ROWS */
@@ -194,8 +214,8 @@ button:active{ transform:scale(.96); }
   gap:4px;
 }
 .inpr-contract .ib{
-  flex:1 1 22%;
-  min-width:130px;
+  flex:1 1 18%;
+  min-width:110px;
 }
 .ib label{
   font-size:.78rem;
@@ -216,8 +236,8 @@ button:active{ transform:scale(.96); }
     gap:8px;
   }
   .inpr-contract .ib{
-    flex:1 1 24%;
-    min-width:100px;
+    flex:1 1 20%;
+    min-width:96px;
   }
   .ib label{
     font-size:.7rem;
@@ -427,14 +447,10 @@ canvas{
     <!-- DISPLAY -->
     <div id="display" class="disp">00:00.00</div>
 
-    <!-- BOTONES -->
+    <!-- BOTONES PRINCIPALES -->
     <div class="btns">
       <button id="btnStartPause" class="sp">Start</button>
       <button id="btnLap" class="lp">LAP</button>
-      <button id="btnReset" class="rs">Reset</button>
-      <button id="btnAddManual" class="sec">Add Manual Lap</button>
-      <button id="btnCopySummary" class="copyBtn">Copy Summary</button>
-      <button id="btnCopyAll" class="copyBtn">Copy All</button>
     </div>
   </div>
 
@@ -473,6 +489,10 @@ canvas{
         <option value="day">Day</option>
         <option value="week">Week</option>
       </select>
+    </div>
+    <div class="ib">
+      <label>Efficiency (%)</label>
+      <input id="effInput" type="number" min="1" max="100" value="100">
     </div>
   </div>
 
@@ -545,8 +565,16 @@ canvas{
     </table>
   </div>
 
+  <!-- COPY BAR + BOTONES SECUNDARIOS -->
+  <div class="copyBar">
+    <button id="btnCopyAll" class="copyBtn">Copy All</button>
+    <button id="btnCopySummary" class="copyBtn">Copy Summary</button>
+    <button id="btnAddManual" class="smallBtn">Add Manual Lap</button>
+    <button id="btnReset" class="smallBtn">Reset</button>
+  </div>
+
   <!-- LAPS TABLE -->
-  <div class="tblc" style="margin-top:14px;">
+  <div class="tblc" style="margin-top:4px;">
     <table>
       <thead>
         <tr>
@@ -625,6 +653,7 @@ const sdcInput      = document.getElementById("sdcInput");
 const hoursInput    = document.getElementById("hoursInput");
 const daysInput     = document.getElementById("daysInput");
 const viewMode      = document.getElementById("viewMode");
+const effInput      = document.getElementById("effInput");
 
 const ctTargetRow   = document.getElementById("ctTargetRow");
 const ctMedianRow   = document.getElementById("ctMedianRow");
@@ -965,29 +994,34 @@ function renderProcessCapacity(){
   let hrs = parseFloat(hoursInput.value) || 0;
   let dpm = parseInt(daysInput.value) || 0;
   let view = viewMode.value;
+  let eff = parseFloat(effInput.value);
+  if(isNaN(eff) || eff<=0) eff = 100;
+  let effFactor = eff/100;
 
   for(let p in map){
     let arr = map[p];
     let med = median(arr);
-    let cap = 0;
+    let capReal = 0;
+    let capAdj  = 0;
     let capNeeded = 0;
     let ratio = 0;
 
     let hoursFactor = hrs * (view === "day" ? 1 : dpm || 0);
     if(hoursFactor>0 && med>0){
-      cap = (hoursFactor * 3600) / med;
+      capReal = (hoursFactor * 3600) / med;
+      capAdj  = capReal * effFactor;
     }
 
     if(pcd>0 && hrs>0 && dpm>0){
       capNeeded = (view === "day" ? pcd : pcd*dpm);
-      ratio = capNeeded>0 ? (cap/capNeeded) : 0;
+      ratio = capNeeded>0 ? (capAdj/capNeeded) : 0;
     }
 
     let tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p}</td>
       <td>${med.toFixed(1)}</td>
-      <td>${cap ? cap.toFixed(0) : "-"}</td>
+      <td>${capAdj ? capAdj.toFixed(0) : "-"}</td>
       <td>${ratio ? (ratio*100).toFixed(0)+"%" : "-"}</td>
     `;
     if(ratio){
@@ -1017,14 +1051,18 @@ function renderCompliance(){
   let hrs = parseFloat(hoursInput.value) || 0;
   let dpm = parseInt(daysInput.value) || 0;
   let view= viewMode.value;
+  let eff = parseFloat(effInput.value);
+  if(isNaN(eff) || eff<=0) eff = 100;
+  let effFactor = eff/100;
 
   let ctTarget  = (pcd>0 && hrs>0) ? (hrs*3600)/pcd : 0;
   let capNeeded = (pcd>0 && dpm>0) ? (view==="day"?pcd:pcd*dpm) : 0;
   let ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
 
   let hoursFactor = hrs * (view==="day"?1:dpm||0);
-  let capActual = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
-  let capRatio  = (capNeeded>0) ? (capActual/capNeeded)*100 : 0;
+  let capReal = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
+  let capAdj  = capReal * effFactor;
+  let capRatio  = (capNeeded>0 && capAdj>0) ? (capAdj/capNeeded)*100 : 0;
 
   let usl = ctTarget ? ctTarget*1.15 : 0;
   let lsl = ctTarget ? ctTarget*0.85 : 0;
@@ -1054,9 +1092,9 @@ function renderCompliance(){
   `);
   rows.push(`
     <tr>
-      <td>Capacity</td>
+      <td>Capacity (Adj)</td>
       <td>${capNeeded ? capNeeded.toFixed(0) : "-"}</td>
-      <td>${capActual ? capActual.toFixed(0) : "-"}</td>
+      <td>${capAdj ? capAdj.toFixed(0) : "-"}</td>
       <td>${capNeeded ? capRatio.toFixed(0)+"%" : "-"}</td>
       <td>
         ${ capNeeded ?
@@ -1125,7 +1163,6 @@ function drawAllGraphs(){
   let dpm = parseInt(daysInput.value) || 0;
   let view= viewMode.value;
 
-  // CT Target basado en contrato si existe, si no usamos mean sólo para visualizar líneas
   let ctTargetContract = (pcd>0 && hrs>0) ? (hrs*3600)/pcd : 0;
   let ctTargetForGraphs = ctTargetContract || mean || 1;
 
@@ -1468,13 +1505,18 @@ function updateCapacityPanel(){
   let hrs = parseFloat(hoursInput.value) || 0;
   let dpm = parseInt(daysInput.value) || 0;
   let view= viewMode.value;
+  let eff = parseFloat(effInput.value);
+  if(isNaN(eff) || eff<=0) eff = 100;
+  let effFactor = eff/100;
 
-  // Calculadora de capacidad (sin PCD)
+  // Calculadora de capacidad (sin PCD) – 100% y ajustada
   let hoursFactor = hrs * (view==="day"?1:(dpm||0));
-  let capActual = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
-  if(capActual){
+  let capReal = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
+  let capAdj  = capReal * effFactor;
+
+  if(capReal){
     capActualRow.textContent =
-      `Actual Capacity (calculator): ${capActual.toFixed(0)} pcs/${view}`;
+      `Capacity @100%: ${capReal.toFixed(0)} pcs/${view} | @${eff.toFixed(0)}%: ${capAdj.toFixed(0)} pcs/${view}`;
   }else{
     capActualRow.textContent = "Actual Capacity (calculator): -";
   }
@@ -1489,7 +1531,7 @@ function updateCapacityPanel(){
   if(pcd>0 && hrs>0 && dpm>0){
     capNeeded = (view==="day"?pcd:pcd*dpm);
     ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
-    capRatio  = (capNeeded>0 && capActual>0) ? (capActual/capNeeded)*100 : 0;
+    capRatio  = (capNeeded>0 && capAdj>0) ? (capAdj/capNeeded)*100 : 0;
 
     let usl = ctTarget * 1.15;
     let lsl = ctTarget * 0.85;
@@ -1503,7 +1545,7 @@ function updateCapacityPanel(){
     capContractRow.textContent =
       `Contract Capacity: ${capNeeded.toFixed(0)} pcs/${view}`;
     capRatioRow.textContent =
-      `Capacity Ratio vs Contract: ${capRatio.toFixed(0)}%`;
+      `Capacity Ratio vs Contract (Adj): ${capRatio.toFixed(0)}%`;
     cpRow.textContent  = `Cp: ${cp.toFixed(2)}`;
     cpkRow.textContent = `Cpk: ${cpk.toFixed(2)}`;
 
@@ -1543,6 +1585,9 @@ btnCopyAll.onclick = () => {
   let hrs = parseFloat(hoursInput.value) || 0;
   let dpm = parseInt(daysInput.value) || 0;
   let view= viewMode.value;
+  let eff = parseFloat(effInput.value);
+  if(isNaN(eff) || eff<=0) eff = 100;
+  let effFactor = eff/100;
 
   let headerProc = activeProcess || "Global";
 
@@ -1558,8 +1603,9 @@ btnCopyAll.onclick = () => {
   let ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
 
   let hoursFactor = hrs * (view==="day"?1:(dpm||0));
-  let capActual = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
-  let capRatio  = (capNeeded>0 && capActual>0) ? (capActual/capNeeded)*100 : 0;
+  let capReal = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
+  let capAdj  = capReal * effFactor;
+  let capRatio  = (capNeeded>0 && capAdj>0) ? (capAdj/capNeeded)*100 : 0;
 
   let usl = ctTarget ? ctTarget * 1.15 : 0;
   let lsl = ctTarget ? ctTarget * 0.85 : 0;
@@ -1575,18 +1621,20 @@ btnCopyAll.onclick = () => {
   txt += `PCD (day):\t${pcd ? pcd.toFixed(1) : "-"} pcs\n`;
   txt += `Hours/day:\t${hrs ? hrs.toFixed(1) : "-"} h\n`;
   txt += `Days/week:\t${dpm || "-"}\n`;
-  txt += `View:\t${view}\n\n`;
+  txt += `View:\t${view}\n`;
+  txt += `Efficiency:\t${eff.toFixed(0)}%\n\n`;
 
   if(ctMed>0){
     txt += `CT Median:\t${ctMed.toFixed(1)} s\n`;
     txt += `Std Dev:\t${stdv.toFixed(2)} s\n`;
     txt += `CV:\t${cv.toFixed(1)}%\n\n`;
-    txt += `Actual Capacity (${view}):\t${capActual ? capActual.toFixed(0) : "-"} pcs\n`;
+    txt += `Capacity @100% (${view}):\t${capReal ? capReal.toFixed(0) : "-"} pcs\n`;
+    txt += `Capacity @${eff.toFixed(0)}% (${view}):\t${capAdj ? capAdj.toFixed(0) : "-"} pcs\n`;
     if(ctTarget>0){
       txt += `CT Target:\t${ctTarget.toFixed(1)} s\n`;
       txt += `CT Ratio:\t${ctRatio.toFixed(0)}%\n`;
       txt += `Contract Capacity (${view}):\t${capNeeded ? capNeeded.toFixed(0) : "-"} pcs\n`;
-      txt += `Capacity Ratio:\t${capRatio ? capRatio.toFixed(0) : "-"}%\n`;
+      txt += `Capacity Ratio (Adj):\t${capRatio ? capRatio.toFixed(0) : "-"}%\n`;
       txt += `Cp:\t${cp.toFixed(2)}\n`;
       txt += `Cpk:\t${cpk.toFixed(2)}\n\n`;
     }
@@ -1631,6 +1679,9 @@ btnCopySummary.onclick = () => {
   let hrs = parseFloat(hoursInput.value) || 0;
   let dpm = parseInt(daysInput.value) || 0;
   let view= viewMode.value;
+  let eff = parseFloat(effInput.value);
+  if(isNaN(eff) || eff<=0) eff = 100;
+  let effFactor = eff/100;
 
   if(!hrs || !dpm){
     alert("Hours per day and Days per week required for summary.");
@@ -1654,9 +1705,10 @@ btnCopySummary.onclick = () => {
     let med = median(arr);
     if(med<=0) return;
     let hoursFactor = hrs * (view==="day"?1:(dpm||0));
-    let capActual = (hoursFactor>0) ? (hoursFactor*3600)/med : 0;
-    let ratio = capNeeded>0 ? (capActual/capNeeded)*100 : 0;
-    rows.push({proc:p, ctmed:med, cap:capActual, ratio});
+    let capReal = (hoursFactor>0) ? (hoursFactor*3600)/med : 0;
+    let capAdj  = capReal * effFactor;
+    let ratio = capNeeded>0 ? (capAdj/capNeeded)*100 : 0;
+    rows.push({proc:p, ctmed:med, cap:capAdj, ratio});
   });
 
   if(!rows.length){
@@ -1674,8 +1726,9 @@ btnCopySummary.onclick = () => {
   txt += `PCD (day):\t${pcd ? pcd.toFixed(1) : "-"} pcs\n`;
   txt += `Hours/day:\t${hrs.toFixed(1)} h\n`;
   txt += `Days/week:\t${dpm}\n`;
-  txt += `View:\t${view}\n\n`;
-  txt += "Process\tCTmed (s)\tCapacity\t% vs contract\n";
+  txt += `View:\t${view}\n`;
+  txt += `Efficiency:\t${eff.toFixed(0)}%\n\n`;
+  txt += "Process\tCTmed (s)\tCapacity (Adj)\t% vs contract\n";
   rows.forEach(r=>{
     txt += [
       r.proc,
@@ -1698,7 +1751,7 @@ btnCopySummary.onclick = () => {
 };
 
 // ============== INPUT LISTENERS & REFRESH ============
-[sdcInput,hoursInput,daysInput,viewMode].forEach(el=>{
+[sdcInput,hoursInput,daysInput,viewMode,effInput].forEach(el=>{
   el.addEventListener("input", fullRefresh);
 });
 processInput.addEventListener("input", ()=>{
