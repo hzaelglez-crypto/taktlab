@@ -263,7 +263,34 @@ button:active{ transform:scale(.96); }
   font-size:.9rem;
   margin-bottom:6px;
 }
-.cr{ font-size:.83rem; margin-bottom:4px; }
+
+/* KPI STRIP (MEDIAN / CAP/HOUR) */
+.kpiRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:8px;
+}
+.kpiCard{
+  flex:1 1 30%;
+  min-width:150px;
+  background:linear-gradient(135deg,#111827,#020617);
+  border:1px solid #1F2937;
+  border-radius:10px;
+  padding:6px 10px;
+}
+.kpiLabel{
+  font-size:.70rem;
+  color:var(--t2);
+  margin-bottom:2px;
+}
+.kpiValue{
+  font-size:1.05rem;
+  font-weight:700;
+}
+
+/* capacity rows */
+.cr{ font-size:.83rem; margin-bottom:3px; }
 .cg{ color:var(--c4); font-weight:700; }
 .cy{ color:var(--c6); font-weight:700; }
 .crd{ color:var(--c5); font-weight:700; }
@@ -289,8 +316,9 @@ button:active{ transform:scale(.96); }
   font-size:.78rem;
 }
 .compTbl th{
-  padding:4px;
-  background:var(--c1);
+  padding:4px 6px;
+  background:#020617;
+  border-bottom:1px solid #1F2937;
   white-space:nowrap;
 }
 .compTbl td{
@@ -300,7 +328,7 @@ button:active{ transform:scale(.96); }
   text-align:center;
 }
 
-/* TABLES */
+/* TABLES (DATA / SUMMARY) */
 .tblc{
   background:var(--b3);
   padding:6px;
@@ -317,7 +345,7 @@ table{
 thead{
   position:sticky;
   top:0;
-  background:var(--c1);
+  background:#020617;
   z-index:2;
 }
 th,td{
@@ -329,6 +357,12 @@ th,td{
 th:first-child, td:first-child{ text-align:center; }
 th:nth-child(2), td:nth-child(2){ text-align:left; }
 
+/* zebra rows */
+.tblc tbody tr:nth-child(even){
+  background:rgba(15,23,42,0.85);
+}
+
+/* highlight good/bad */
 .rg{ background:rgba(0,200,83,.28); }
 .rb{ background:rgba(213,0,0,.28); }
 
@@ -396,7 +430,7 @@ canvas{
   font-size:.78rem;
 }
 .graphStatsBox th{
-  background:var(--c1);
+  background:#020617;
   text-align:left;
 }
 
@@ -499,6 +533,23 @@ canvas{
   <!-- CAPACITY PANEL -->
   <div class="cap" id="capacityPanel">
     <div class="ct">Capacity & Contract Overview</div>
+
+    <!-- KPI STRIP -->
+    <div class="kpiRow">
+      <div class="kpiCard">
+        <div class="kpiLabel">MED CT (s)</div>
+        <div class="kpiValue" id="kpiMedian">-</div>
+      </div>
+      <div class="kpiCard">
+        <div class="kpiLabel">Capacity / Hour @100%</div>
+        <div class="kpiValue" id="kpiCapHr100">-</div>
+      </div>
+      <div class="kpiCard">
+        <div class="kpiLabel">Capacity / Hour @Eff%</div>
+        <div class="kpiValue" id="kpiCapHrEff">-</div>
+      </div>
+    </div>
+
     <div class="cr" id="ctTargetRow">CT Target (contract): -</div>
     <div class="cr" id="ctMedianRow">CT Median: -</div>
     <div class="cr" id="ctRatioRow">CT Ratio vs Target: -</div>
@@ -654,6 +705,10 @@ const hoursInput    = document.getElementById("hoursInput");
 const daysInput     = document.getElementById("daysInput");
 const viewMode      = document.getElementById("viewMode");
 const effInput      = document.getElementById("effInput");
+
+const kpiMedian     = document.getElementById("kpiMedian");
+const kpiCapHr100   = document.getElementById("kpiCapHr100");
+const kpiCapHrEff   = document.getElementById("kpiCapHrEff");
 
 const ctTargetRow   = document.getElementById("ctTargetRow");
 const ctMedianRow   = document.getElementById("ctMedianRow");
@@ -1468,8 +1523,13 @@ function recolorRows(ctTarget){
   });
 }
 
-// ============== CAPACITY PANEL ============
+// ============== CAPACITY PANEL (incluye Cap/hora SIEMPRE) ============
 function updateCapacityPanel(){
+  // reset KPIs
+  kpiMedian.textContent   = "-";
+  kpiCapHr100.textContent = "-";
+  kpiCapHrEff.textContent = "-";
+
   if(!activeProcess){
     ctTargetRow.textContent    = "CT Target (contract): -";
     ctMedianRow.textContent    = "CT Median: -";
@@ -1482,6 +1542,7 @@ function updateCapacityPanel(){
     capVerdictRow.textContent  = "";
     return;
   }
+
   let list = cycles.filter(c => c.process === activeProcess);
   if(!list.length){
     ctTargetRow.textContent    = "CT Target (contract): -";
@@ -1509,19 +1570,23 @@ function updateCapacityPanel(){
   if(isNaN(eff) || eff<=0) eff = 100;
   let effFactor = eff/100;
 
-  // Calculadora de capacidad (sin PCD) – 100% y ajustada
-  let hoursFactor = hrs * (view==="day"?1:(dpm||0));
-  let capReal = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
-  let capAdj  = capReal * effFactor;
+  // ====== Capacidad por HORA (independiente de PCD/Horas) ======
+  let capHourReal = ctMed>0 ? 3600/ctMed : 0;
+  let capHourAdj  = capHourReal * effFactor;
 
-  if(capReal){
+  kpiMedian.textContent   = ctMed ? ctMed.toFixed(2) : "-";
+  kpiCapHr100.textContent = capHourReal ? capHourReal.toFixed(0)+" pcs/h" : "-";
+  kpiCapHrEff.textContent = capHourAdj ? capHourAdj.toFixed(0)+" pcs/h" : "-";
+
+  // Mostrar también en texto
+  if(capHourReal){
     capActualRow.textContent =
-      `Capacity @100%: ${capReal.toFixed(0)} pcs/${view} | @${eff.toFixed(0)}%: ${capAdj.toFixed(0)} pcs/${view}`;
+      `Capacity / hour: ${capHourReal.toFixed(0)} pcs @100% | ${capHourAdj.toFixed(0)} pcs @${eff.toFixed(0)}%`;
   }else{
     capActualRow.textContent = "Actual Capacity (calculator): -";
   }
 
-  // Datos de contrato (sólo si hay PCD + horas + días)
+  // ====== Datos de contrato (sólo si hay PCD + horas + días) ======
   let ctTarget = (pcd>0 && hrs>0) ? (hrs*3600)/pcd : 0;
   let capNeeded = 0;
   let ctRatio = 0;
@@ -1531,7 +1596,12 @@ function updateCapacityPanel(){
   if(pcd>0 && hrs>0 && dpm>0){
     capNeeded = (view==="day"?pcd:pcd*dpm);
     ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
-    capRatio  = (capNeeded>0 && capAdj>0) ? (capAdj/capNeeded)*100 : 0;
+
+    // Capacidad día/semana con median CT
+    let hoursFactor = hrs * (view==="day"?1:(dpm||0));
+    let capRealDayWeek = (hoursFactor>0 && ctMed>0) ? (hoursFactor*3600)/ctMed : 0;
+    let capAdjDayWeek  = capRealDayWeek * effFactor;
+    capRatio  = (capNeeded>0 && capAdjDayWeek>0) ? (capAdjDayWeek/capNeeded)*100 : 0;
 
     let usl = ctTarget * 1.15;
     let lsl = ctTarget * 0.85;
@@ -1598,6 +1668,10 @@ btnCopyAll.onclick = () => {
   let avg   = totals.length ? average(totals) : 0;
   let cv    = avg ? (stdv/avg)*100 : 0;
 
+  // Capacidad por hora SIEMPRE
+  let capHourReal = ctMed>0 ? 3600/ctMed : 0;
+  let capHourAdj  = capHourReal * effFactor;
+
   let ctTarget  = (pcd>0 && hrs>0) ? (hrs*3600)/pcd : 0;
   let capNeeded = (pcd>0 && dpm>0) ? (view==="day"?pcd:pcd*dpm) : 0;
   let ctRatio   = (ctTarget>0 && ctMed>0) ? (ctMed/ctTarget)*100 : 0;
@@ -1628,6 +1702,8 @@ btnCopyAll.onclick = () => {
     txt += `CT Median:\t${ctMed.toFixed(1)} s\n`;
     txt += `Std Dev:\t${stdv.toFixed(2)} s\n`;
     txt += `CV:\t${cv.toFixed(1)}%\n\n`;
+    txt += `Capacity / hour @100%:\t${capHourReal ? capHourReal.toFixed(0) : "-"} pcs/h\n`;
+    txt += `Capacity / hour @${eff.toFixed(0)}%:\t${capHourAdj ? capHourAdj.toFixed(0) : "-"} pcs/h\n`;
     txt += `Capacity @100% (${view}):\t${capReal ? capReal.toFixed(0) : "-"} pcs\n`;
     txt += `Capacity @${eff.toFixed(0)}% (${view}):\t${capAdj ? capAdj.toFixed(0) : "-"} pcs\n`;
     if(ctTarget>0){
