@@ -84,6 +84,8 @@
     border-right-color:transparent;
     border-bottom-color:transparent;
     transform-origin:50% 50%;
+  }
+  .logo-gear.spinning::before{
     animation:logo-spin 2s linear infinite;
   }
   @keyframes logo-spin{
@@ -192,7 +194,7 @@
   }
   .mode-row input[type="number"]{width:70px;}
 
-  /* T1/T2 mini indicators (NO sticky, van en sección de controles) */
+  /* T1/T2 mini indicators */
   .mini-t12-wrapper{
     display:flex;
     gap:8px;
@@ -364,7 +366,7 @@
   <div class="sticky-timer-bar">
     <div class="top-row">
       <div class="logo-circle">
-        <div class="logo-gear"></div>
+        <div class="logo-gear" id="logoGear"></div>
       </div>
       <div class="title-block">
         <div class="title-main">TaktLab</div>
@@ -443,6 +445,7 @@
         </div>
       </div>
     </div>
+
     <!-- Process Capacity Overview -->
     <div class="section-card">
       <div class="section-title">Process Capacity Overview</div>
@@ -570,6 +573,7 @@
   const btnStart = document.getElementById('btnStart');
   const btnLap = document.getElementById('btnLap');
   const timerCard = document.getElementById('timerCard');
+  const logoGear = document.getElementById('logoGear');
 
   const processInput = document.getElementById('processName');
   const modeSelect   = document.getElementById('mode');
@@ -630,8 +634,10 @@
     if(!running){
       ringT1.classList.add('paused');
       ringT2.classList.add('paused');
+      logoGear.classList.remove('spinning');
       return;
     }
+    logoGear.classList.add('spinning');
     if(mode === 'CT'){
       ringT1.classList.remove('paused');
       ringT2.classList.add('paused');
@@ -650,16 +656,21 @@
     const now = performance.now();
     elapsed = now - startTime;
     updateDisplay();
-    if(running && modeSelect.value === 'MLD'){
+
+    const mode = modeSelect.value;
+    const secs = Math.max(elapsed/1000,0);
+
+    if(running && mode === 'MLD'){
       if(pendingT1 === null){
-        t1Indicator.textContent = formatSecs(elapsed/1000)+' s';
+        t1Indicator.textContent = formatSecs(secs)+' s';
       }else{
-        const t2 = (elapsed/1000) - pendingT1;
+        const t2 = Math.max(secs - pendingT1,0);
         t2Indicator.textContent = formatSecs(t2)+' s';
       }
-    }else if(running && modeSelect.value === 'CT'){
-      t1Indicator.textContent = formatSecs(elapsed/1000)+' s';
+    }else if(running && mode === 'CT'){
+      t1Indicator.textContent = formatSecs(secs)+' s';
     }
+
     timerId = requestAnimationFrame(tick);
   }
 
@@ -718,7 +729,7 @@
       return;
     }
 
-    const seconds = elapsed/1000;
+    const seconds = Math.max(elapsed/1000,0);
 
     if(mode === 'CT'){
       laps.push({
@@ -792,7 +803,6 @@
   });
 
   modeSelect.addEventListener('change',()=>{
-    // cambiar comportamiento CT vs MLD
     pendingT1 = null;
     t1Indicator.textContent='0.0 s';
     t2Indicator.textContent='0.0 s';
@@ -1359,7 +1369,7 @@
       ctx.fillRect(x,y,barW-2,barH);
     });
 
-    // curva normal teórica (aprox)
+    // curva normal teórica
     if(st.std>0){
       const points = 80;
       let maxPdf=0;
@@ -1448,22 +1458,165 @@
     copyToClipboard(header.join('\t')+'\n'+rows.join('\n'));
   });
 
-  btnCopySum.addEventListener('click',()=>{
+  // ==== Summary completo (overview + stats + contract + focus) ====
+  function buildFullSummaryText(){
     const groups = groupByProcess();
-    if(!groups.size){
+    if(!groups.size) return '';
+
+    const eff   = Math.min(Math.max(parseFloat(effInput.value)||100,10),100);
+    const hours = Math.min(Math.max(parseFloat(hInput.value)||8,1),24);
+    const days  = Math.min(Math.max(parseInt(dInput.value)||5,1),7);
+    const pcd   = parseFloat(pcdInput.value)||0;
+    const view  = capViewSel.value;
+    const ctTarget = computeCtTargetSeconds();
+
+    const lines = [];
+    lines.push('TAKTLAB SUMMARY');
+    lines.push('');
+
+    // Overview
+    lines.push('PROCESS CAPACITY OVERVIEW');
+    lines.push('Process\tMode\tN\tCTmed(s)\tCap100\tCap@Eff\t% vs contract');
+    groups.forEach((arr,key)=>{
+      const [proc,mode]=key.split('||');
+      const st=calcStats(arr);
+      if(!st) return;
+      const ctMed=st.median;
+      let cap100=0;
+      if(ctMed>0){
+        const perHour=3600/ctMed;
+        if(view==='hour') cap100=perHour;
+        else if(view==='day') cap100=perHour*hours;
+        else cap100=perHour*hours*days;
+      }
+      const capEff=cap100*(eff/100);
+      let contractUnits=0;
+      if(pcd>0){
+        if(view==='hour') contractUnits=(pcd/hours)||0;
+        else if(view==='day') contractUnits=pcd;
+        else contractUnits=pcd*days;
+      }
+      let pctVs = contractUnits>0 ? (capEff/contractUnits*100) : NaN;
+      lines.push(
+        `${proc}\t${mode}\t${st.n}\t${formatSecs(ctMed)}\t${cap100?cap100.toFixed(1):'-'}\t${capEff?capEff.toFixed(1):'-'}\t${isFinite(pctVs)?pctVs.toFixed(0)+'%':''}`
+      );
+    });
+
+    lines.push('');
+    // Statistical detail
+    lines.push('STATISTICAL DETAIL');
+    lines.push('Process\tMode\tN\tMean(s)\tMedian(s)\tP10\tP90\tMin\tMax\tStd\tCV%\tCp\tCpk');
+    groups.forEach((arr,key)=>{
+      const [proc,mode]=key.split('||');
+      const st=calcStats(arr);
+      if(!st) return;
+      let cp='-',cpk='-';
+      if(ctTarget && st.std>0){
+        const USL=ctTarget, LSL=0;
+        const cpv=(USL-LSL)/(6*st.std);
+        const cpu=(USL-st.mean)/(3*st.std);
+        const cpl=(st.mean-LSL)/(3*st.std);
+        const cpkv=Math.min(cpu,cpl);
+        cp = cpv.toFixed(2);
+        cpk = cpkv.toFixed(2);
+      }
+      lines.push(
+        `${proc}\t${mode}\t${st.n}\t${formatSecs(st.mean)}\t${formatSecs(st.median)}\t${formatSecs(st.p10)}\t${formatSecs(st.p90)}\t${formatSecs(st.min)}\t${formatSecs(st.max)}\t${formatSecs(st.std)}\t${(st.cv*100).toFixed(1)}\t${cp}\t${cpk}`
+      );
+    });
+
+    lines.push('');
+    // Contract vs capacity summary
+    lines.push('CONTRACT VS CAPACITY SUMMARY');
+    groups.forEach((arr,key)=>{
+      const [proc,mode]=key.split('||');
+      const st=calcStats(arr);
+      if(!st) return;
+      const ctMed=st.median;
+      if(!ctMed) return;
+      let perHour=3600/ctMed;
+      let cap100=0;
+      if(view==='hour') cap100=perHour;
+      else if(view==='day') cap100=perHour*hours;
+      else cap100=perHour*hours*days;
+      const capEff=cap100*(eff/100);
+
+      let contractUnits=0;
+      if(pcd>0){
+        if(view==='hour') contractUnits=(pcd/hours)||0;
+        else if(view==='day') contractUnits=pcd;
+        else contractUnits=pcd*days;
+      }
+      let pct=contractUnits>0?(capEff/contractUnits*100):NaN;
+      let msg='No contract loaded';
+      if(contractUnits>0){
+        msg=`${pct.toFixed(0)}% vs contract`;
+      }
+      lines.push(
+        `${proc} (${mode}) – median CT ${formatSecs(ctMed)} s, capacity@Eff ${capEff?capEff.toFixed(1):'-'} units/${view} – ${msg}`
+      );
+    });
+
+    lines.push('');
+    // Stats focus (conclusiones)
+    lines.push('STATS FOCUS (SIMPLE MESSAGES)');
+    groups.forEach((arr,key)=>{
+      const [proc,mode]=key.split('||');
+      const st=calcStats(arr);
+      if(!st) return;
+      const n=st.n, cv=st.cv, mean=st.mean, med=st.median;
+
+      let recN;
+      if(cv<=0.10) recN=10;
+      else if(cv<=0.20) recN=15;
+      else if(cv<=0.30) recN=25;
+      else recN=40;
+
+      const ratio=n/recN;
+      let sampleMsg;
+      if(ratio<0.6) sampleMsg=`Samples ${n}/${recN}: too low, keep measuring.`;
+      else if(ratio<0.9) sampleMsg=`Samples ${n}/${recN}: almost enough, a few more laps help.`;
+      else sampleMsg=`Samples ${n}/${recN}: ok for quick decision.`;
+
+      let varMsg;
+      if(cv<0.08) varMsg=`Low std (${formatSecs(st.std)} s, ${(cv*100).toFixed(1)}%): stable process.`;
+      else if(cv>0.2) varMsg=`High std (${formatSecs(st.std)} s, ${(cv*100).toFixed(1)}%): unstable timings.`;
+      else varMsg=`Moderate std (${formatSecs(st.std)} s, ${(cv*100).toFixed(1)}%).`;
+
+      const diff=Math.abs(mean-med);
+      let symMsg;
+      if(diff>0.2*med) symMsg=`Mean ${formatSecs(mean)} vs median ${formatSecs(med)}: non-normal, check outliers.`;
+      else symMsg=`Mean ${formatSecs(mean)} ~ median ${formatSecs(med)}: close to normal.`;
+
+      let capMsg='No contract loaded – capability not evaluated.';
+      if(ctTarget && st.std>0){
+        const USL=ctTarget, LSL=0;
+        const cpv=(USL-LSL)/(6*st.std);
+        const cpu=(USL-mean)/(3*st.std);
+        const cpl=(mean-LSL)/(3*st.std);
+        const cpkv=Math.min(cpu,cpl);
+        if(cpkv<1.0) capMsg=`Cp=${cpv.toFixed(2)}, Cpk=${cpkv.toFixed(2)} → process NOT capable – focus here.`;
+        else if(cpkv<1.33) capMsg=`Cp=${cpv.toFixed(2)}, Cpk=${cpkv.toFixed(2)} → borderline – reduce variation.`;
+        else capMsg=`Cp=${cpv.toFixed(2)}, Cpk=${cpkv.toFixed(2)} → process capable vs target.`;
+      }
+
+      lines.push(`${proc} (${mode})`);
+      lines.push(`  - ${sampleMsg}`);
+      lines.push(`  - ${varMsg}`);
+      lines.push(`  - ${symMsg}`);
+      lines.push(`  - ${capMsg}`);
+    });
+
+    return lines.join('\n');
+  }
+
+  btnCopySum.addEventListener('click',()=>{
+    const txt = buildFullSummaryText();
+    if(!txt){
       alert('No summary to copy.');
       return;
     }
-    const lines = [];
-    groups.forEach((arr,key)=>{
-      const [proc,mode] = key.split('||');
-      const st = calcStats(arr);
-      if(!st) return;
-      lines.push(
-        `${proc} (${mode})\tN=${st.n}\tMean=${formatSecs(st.mean)}s\tMedian=${formatSecs(st.median)}s\tStd=${formatSecs(st.std)}s\tP10=${formatSecs(st.p10)}s\tP90=${formatSecs(st.p90)}s`
-      );
-    });
-    copyToClipboard(lines.join('\n'));
+    copyToClipboard(txt);
   });
 
   function renderAll(){
