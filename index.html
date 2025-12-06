@@ -41,7 +41,7 @@
     padding-bottom: 48px;
   }
 
-  /* Top bar (sin crédito arriba ahora) */
+  /* Top bar */
   .top-bar {
     position: sticky;
     top: 0;
@@ -109,7 +109,6 @@
     border-right-color: var(--accent-green);
     border-bottom-color: #cccccc;
     border-left-color: #cccccc;
-    /* Animación solo cuando tenga la clase .running */
   }
 
   .logo-ring.running {
@@ -137,10 +136,10 @@
     color: var(--text-soft);
   }
 
-  /* Sticky stopwatch bar (ONLY chrono + start + lap) */
+  /* Sticky stopwatch bar */
   .sticky-panel {
     position: sticky;
-    top: 52px; /* debajo del top-bar */
+    top: 52px;
     z-index: 50;
     padding: 6px 12px 0;
     background: linear-gradient(to bottom, rgba(5, 11, 25, 0.98), rgba(5, 11, 25, 0.9));
@@ -215,7 +214,7 @@
     border-radius: 10px;
   }
 
-  /* Inputs & indicators (scrollable) */
+  /* Main cards */
   .cards {
     padding: 10px 12px;
     display: flex;
@@ -481,7 +480,7 @@
     color: rgba(111,124,165,0.8);
   }
 
-  /* Tabla compacta para Cp/Cpk & percentiles */
+  /* Mini table for Cp/Cpk & percentiles */
   .mini-cap-table {
     width: 100%;
     border-collapse: collapse;
@@ -498,6 +497,34 @@
 
   .mini-cap-table th {
     color: var(--text-soft);
+  }
+
+  /* Conclusions */
+  .conclusions-block {
+    margin-top: 6px;
+    font-size: 0.72rem;
+  }
+
+  .conclusions-block-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--text-soft);
+  }
+
+  .conclusion {
+    margin-bottom: 2px;
+  }
+
+  .conclusion.good {
+    color: var(--good);
+  }
+
+  .conclusion.warn {
+    color: var(--warn);
+  }
+
+  .conclusion.bad {
+    color: var(--bad);
   }
 
   /* Flash overlay for LAP feedback */
@@ -519,6 +546,11 @@
     30% { opacity: 0.45; }
     100% { opacity: 0; }
   }
+
+  @keyframes spinT {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 </style>
 </head>
 <body>
@@ -539,7 +571,7 @@
   <!-- FLASH OVERLAY -->
   <div id="flashOverlay"></div>
 
-  <!-- STICKY STOPWATCH (ONLY chrono + start/lap) -->
+  <!-- STICKY STOPWATCH -->
   <div class="sticky-panel">
     <div class="stopwatch-card">
       <div id="stopwatchDisplay" class="stopwatch-display">00:00.00</div>
@@ -550,7 +582,7 @@
     </div>
   </div>
 
-  <!-- MAIN CARDS (SCROLLABLE) -->
+  <!-- MAIN CARDS -->
   <div class="cards">
 
     <!-- SETUP & MODE -->
@@ -616,14 +648,14 @@
       </div>
     </div>
 
-    <!-- SUMMARY BLOCK -->
+    <!-- SUMMARY & STATS -->
     <div class="card">
       <div class="card-header">
         <h2>Process Capacity Overview &amp; Statistics</h2>
         <small>Median CT, stats, capacity and contract check per process</small>
       </div>
 
-      <!-- Overview with stats -->
+      <!-- Overview -->
       <div style="overflow-x:auto; max-height:260px;">
         <table id="summaryTable">
           <thead>
@@ -645,14 +677,14 @@
         </table>
       </div>
 
-      <!-- Stats focus -->
-      <div class="subsection-title">Stats focus (Cp/Cpk, percentiles &amp; N)</div>
+      <!-- Stats focus + conclusions -->
+      <div class="subsection-title">Stats focus (Cp/Cpk, percentiles, N &amp; conclusions)</div>
       <div class="field">
         <label for="statsProcessSelect">Process / Mode</label>
         <select id="statsProcessSelect"></select>
       </div>
       <div id="capabilitySummary" style="margin-top:4px; font-size:0.74rem; color:var(--text-soft);">
-        Select a process to see Cp/Cpk, percentiles and N.
+        Select a process to see Cp/Cpk, percentiles and conclusions.
       </div>
 
       <!-- Contract vs capacity summary -->
@@ -712,7 +744,7 @@
     <div class="card">
       <div class="card-header">
         <h2>Distribution &amp; Capability Plots</h2>
-        <small>Histogram, scatter &amp; Cp/Cpk bar</small>
+        <small>Histogram, scatter &amp; Cp/Cpk / efficiency bar</small>
       </div>
       <div class="field" style="margin-bottom:6px;">
         <label for="graphProcessSelect">Graph focus</label>
@@ -751,7 +783,7 @@
   const statsProcessSelect = document.getElementById("statsProcessSelect");
   const contractPcdInput = document.getElementById("contractPcd");
   const hoursPerDayInput = document.getElementById("hoursPerDay");
-  const daysPerWeekInput = document.getElementById("daysPerWeek"); // reserved
+  const daysPerWeekInput = document.getElementById("daysPerWeek");
   const efficiencyInput = document.getElementById("efficiency");
   const t1Indicator = document.getElementById("t1Indicator");
   const t2Indicator = document.getElementById("t2Indicator");
@@ -1279,7 +1311,7 @@
   }
 
   function colorClassForCp(val) {
-    if (val == null) return "";
+    if (val == null || isNaN(val)) return "";
     if (val >= 1.33) return "tag-good";
     if (val >= 1.0) return "tag-warn";
     return "tag-bad";
@@ -1288,7 +1320,7 @@
   function updateStatsPanel() {
     const key = statsProcessSelect.value;
     if (!key) {
-      capabilitySummary.textContent = "Select a process to see Cp/Cpk, percentiles and N.";
+      capabilitySummary.textContent = "Select a process to see Cp/Cpk, percentiles and conclusions.";
       return;
     }
     const data = getProcessDataByKey(key);
@@ -1319,6 +1351,65 @@
     const cpClass = colorClassForCp(cp);
     const cpkClass = colorClassForCp(cpk);
 
+    // Conclusions logic
+    const conclusions = [];
+
+    // Sample size
+    if (N < 10) {
+      conclusions.push({ level: "bad", text: "Sample size very low – collect more data before taking decisions." });
+    } else if (N < 20) {
+      conclusions.push({ level: "warn", text: "Sample size moderate – more samples will improve confidence." });
+    } else {
+      conclusions.push({ level: "good", text: "Sample size is adequate for a basic capability view." });
+    }
+
+    // Cp / Cpk
+    if (cp < 1.0 || cpk < 1.0) {
+      conclusions.push({ level: "bad", text: "Process currently not capable – focus here (Cp/Cpk < 1.0)." });
+    } else if (cp < 1.33 || cpk < 1.33) {
+      conclusions.push({ level: "warn", text: "Process marginal vs tolerance – keep under close monitoring (Cp/Cpk between 1.0 and 1.33)." });
+    } else {
+      conclusions.push({ level: "good", text: "Process capable vs short-term target (Cp/Cpk ≥ 1.33)." });
+    }
+
+    // Variation (CV)
+    const cv = meanVal ? (std / meanVal) : 0;
+    if (cv > 0.30) {
+      conclusions.push({ level: "bad", text: "High variation – review special causes and stability of the process." });
+    } else if (cv > 0.20) {
+      conclusions.push({ level: "warn", text: "Moderate variation – watch stability and repeatability." });
+    } else {
+      conclusions.push({ level: "good", text: "Variation is under control for this sample window." });
+    }
+
+    // Stability (simple 3σ check)
+    let ooc = 0;
+    if (std > 0) {
+      const limit = 3 * std;
+      data.forEach(v => {
+        if (Math.abs(v - meanVal) > limit) ooc++;
+      });
+    }
+    if (ooc > 0) {
+      conclusions.push({ level: "warn", text: `Some points beyond 3σ – process might not be stable (${ooc} out-of-control points).` });
+    } else {
+      conclusions.push({ level: "good", text: "No points beyond 3σ – no obvious out-of-control signals in this window." });
+    }
+
+    // Distribution shape (mean vs median)
+    const diffMM = Math.abs(meanVal - medVal);
+    if (std > 0 && diffMM / std > 0.5) {
+      conclusions.push({ level: "warn", text: "Distribution looks non-symmetric – use median and percentiles as main reference." });
+    } else {
+      conclusions.push({ level: "good", text: "Mean and median are aligned – distribution is roughly symmetric for this sample." });
+    }
+
+    let concHTML = '<div class="conclusions-block"><div class="conclusions-block-title">Conclusions</div>';
+    conclusions.forEach(c => {
+      concHTML += `<div class="conclusion ${c.level}">• ${c.text}</div>`;
+    });
+    concHTML += "</div>";
+
     capabilitySummary.innerHTML =
       `<table class="mini-cap-table">
          <tr><th>Metric</th><th>Value</th></tr>
@@ -1330,7 +1421,7 @@
              <td>${p10.toFixed(2)} / ${p25.toFixed(2)} / ${p50.toFixed(2)} / ${p75.toFixed(2)} / ${p90.toFixed(2)}</td></tr>
          <tr><td>Cp</td><td class="${cpClass}">${cp.toFixed(2)}</td></tr>
          <tr><td>Cpk</td><td class="${cpkClass}">${cpk.toFixed(2)}</td></tr>
-       </table>`;
+       </table>` + concHTML;
   }
 
   graphProcessSelect.addEventListener("change", () => {
@@ -1550,7 +1641,7 @@
     });
   }
 
-  // --- Copy helpers ---
+  // --- Copy helpers (fix: leer valores de inputs/selects) ---
   async function copyToClipboard(text) {
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -1576,7 +1667,19 @@
   function tableToTSV(table) {
     const rows = Array.from(table.querySelectorAll("tr"));
     return rows.map(row => {
-      const cells = Array.from(row.querySelectorAll("th,td")).map(c => c.innerText.replace(/\t/g," "));
+      const cells = Array.from(row.querySelectorAll("th,td")).map(cell => {
+        const input = cell.querySelector("input");
+        const select = cell.querySelector("select");
+        let value = "";
+        if (input) {
+          value = input.value || "";
+        } else if (select) {
+          value = select.value || "";
+        } else {
+          value = (cell.innerText || "").trim();
+        }
+        return value.replace(/\t/g," ");
+      });
       return cells.join("\t");
     }).join("\n");
   }
