@@ -272,36 +272,6 @@
   .badge-warn{background:var(--badge-amber);border-color:#ffe082;}
   .badge-bad{background:var(--badge-red);border-color:#ff8a80;}
 
-  .summary-row-top{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    align-items:flex-end;
-  }
-  .summary-row-top .field{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    font-size:.72rem;
-  }
-  .summary-row-top .field input,
-  .summary-row-top .field select{
-    background:#020b1a;
-    border-radius:8px;
-    border:1px solid var(--border-soft);
-    padding:4px 8px;
-    color:var(--text-soft);
-    font-size:.75rem;
-    min-width:70px;
-  }
-
-  .inline-badges{
-    display:flex;
-    flex-wrap:wrap;
-    gap:4px;
-    margin-top:4px;
-  }
-
   .btn-row-secondary{
     display:flex;
     flex-wrap:wrap;
@@ -350,10 +320,43 @@
     to{background:transparent;}
   }
 
+  /* Stats detail table */
+  .stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:4px;
+    font-size:.72rem;
+  }
+
+  /* Charts */
+  .charts-wrapper{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+    gap:10px;
+  }
+  .chart-card{
+    background:var(--bg-card-soft);
+    border-radius:14px;
+    border:1px solid var(--border-soft);
+    padding:8px;
+  }
+  .chart-title{
+    font-size:.75rem;
+    margin-bottom:4px;
+    color:var(--text-soft);
+  }
+  canvas{
+    width:100%;
+    height:180px;
+    background:#020b1a;
+    border-radius:10px;
+  }
+
   @media (max-width:600px){
     .timer-display{font-size:2.2rem;}
     .btn-row-main{gap:6px;}
     .btn{font-size:.9rem;border-radius:14px;}
+    canvas{height:160px;}
   }
 </style>
 </head>
@@ -460,20 +463,64 @@
       </table>
     </div>
 
+    <!-- Stats detail: median, percentiles, Cp/Cpk etc -->
+    <div class="section-card">
+      <div class="section-title">Statistical Detail (per process)</div>
+      <div style="max-height:260px;overflow:auto;">
+        <table id="statsTable">
+          <thead>
+            <tr>
+              <th>Process</th>
+              <th>Mode</th>
+              <th>N</th>
+              <th>Mean</th>
+              <th>Median</th>
+              <th>P10</th>
+              <th>P90</th>
+              <th>Min</th>
+              <th>Max</th>
+              <th>Std</th>
+              <th>CV%</th>
+              <th>Cp</th>
+              <th>Cpk</th>
+            </tr>
+          </thead>
+          <tbody id="statsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Contract vs Capacity Summary -->
     <div class="section-card">
       <div class="section-title">Contract vs Capacity Summary</div>
       <div id="contractSummary" style="font-size:.78rem;"></div>
     </div>
 
+    <!-- Charts like mini-Minitab -->
+    <div class="section-card">
+      <div class="section-title">Charts (selected process)</div>
+      <div style="margin-bottom:6px;font-size:.75rem;">
+        <label for="chartProcessSelect">Process / Mode:</label>
+        <select id="chartProcessSelect"></select>
+      </div>
+      <div class="charts-wrapper">
+        <div class="chart-card">
+          <div class="chart-title">Time Series with Mean, Median, ±3σ</div>
+          <canvas id="timeSeriesCanvas"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Histogram with Median &amp; Percentiles</div>
+          <canvas id="histCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
     <!-- Stats focus -->
     <div class="section-card">
       <div class="section-title">Stats Focus</div>
-      <div class="stats-focus" id="statsFocus">
-        <!-- lines injected -->
-      </div>
+      <div class="stats-focus" id="statsFocus"></div>
       <div style="margin-top:6px;font-size:.68rem;color:var(--text-muted);">
-        Sample size and stability comments are approximate and meant to guide where to focus measurements.
+        Comments are simplified on purpose: stable / unstable, few / enough samples, capable / not capable.
       </div>
     </div>
 
@@ -534,6 +581,7 @@
   const capViewSel   = document.getElementById('capView');
 
   const overviewBody   = document.getElementById('overviewBody');
+  const statsBody      = document.getElementById('statsBody');
   const contractSummary= document.getElementById('contractSummary');
   const statsFocusDiv  = document.getElementById('statsFocus');
 
@@ -548,12 +596,16 @@
   const t1Indicator = document.getElementById('t1Indicator');
   const t2Indicator = document.getElementById('t2Indicator');
 
+  const chartSelect = document.getElementById('chartProcessSelect');
+  const timeSeriesCanvas = document.getElementById('timeSeriesCanvas');
+  const histCanvas = document.getElementById('histCanvas');
+
   let running = false;
   let startTime = 0;
   let elapsed = 0;
   let timerId = null;
 
-  let laps = []; // {process, mode, status, note, t1, t2, total}
+  let laps = []; // {id, process, mode, status, note, t1, t2, total}
   let nextId = 1;
 
   let pendingT1 = null; // for MLD
@@ -579,7 +631,6 @@
     const now = performance.now();
     elapsed = now - startTime;
     updateDisplay();
-    // update T1/T2 indicators if needed
     if(running && modeSelect.value === 'MLD'){
       if(pendingT1 === null){
         t1Indicator.textContent = formatSecs(elapsed/1000)+' s';
@@ -625,8 +676,7 @@
     setTimeout(()=>timerCard.classList.remove('flash'),120);
   }
 
-  function addLap(manualData){
-    // ensure process & mode have sensible defaults
+  function ensureDefaults(){
     let proc = (processInput.value||'').trim();
     if(!proc){
       proc = 'Process 1';
@@ -634,8 +684,12 @@
     }
     let mode = modeSelect.value || 'CT';
     modeSelect.value = mode;
+    return {proc,mode};
+  }
 
-    const status = ''; // free text later if needed
+  function addLap(manualData){
+    const {proc,mode} = ensureDefaults();
+    const status = '';
     const note = '';
 
     if(manualData){
@@ -645,7 +699,6 @@
       return;
     }
 
-    // normal from timer
     const seconds = elapsed/1000;
 
     if(mode === 'CT'){
@@ -668,15 +721,12 @@
       return;
     }
 
-    // MLD mode
+    // Machine + Load/Unload
     if(pendingT1 === null){
-      // capture T1
       pendingT1 = seconds;
       t1Indicator.textContent = formatSecs(pendingT1)+' s';
-      // reset base for T2
       elapsed = 0;
       startTime = performance.now();
-      return;
     }else{
       const t2 = seconds;
       const t1 = pendingT1;
@@ -727,13 +777,6 @@
     renderAll();
   });
 
-  function renderAll(){
-    renderDataTable();
-    renderOverview();
-    renderContractSummary();
-    renderStatsFocus();
-  }
-
   function renderDataTable(){
     dataBody.innerHTML='';
     laps.forEach((lap,i)=>{
@@ -747,7 +790,7 @@
         <td>${formatSecs(lap.t1)}</td>
         <td>${formatSecs(lap.t2)}</td>
         <td>${formatSecs(lap.total)}</td>
-        <td><button data-id="${lap.id}" class="btn-del" style="background:${'transparent'};border:none;color:${'#ff8a80'};cursor:pointer;font-weight:700;">X</button></td>
+        <td><button data-id="${lap.id}" class="btn-del" style="background:transparent;border:none;color:#ff8a80;cursor:pointer;font-weight:700;">X</button></td>
       `;
       dataBody.appendChild(tr);
     });
@@ -771,6 +814,17 @@
     return map;
   }
 
+  function percentile(values,p){
+    const n = values.length;
+    if(n===0) return NaN;
+    if(n===1) return values[0];
+    const idx = (n-1)*p;
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    if(lo===hi) return values[lo];
+    return values[lo] + (values[hi]-values[lo])*(idx-lo);
+  }
+
   function calcStats(arr){
     if(!arr.length) return null;
     const values = arr.map(x=>x.total).slice().sort((a,b)=>a-b);
@@ -781,20 +835,20 @@
     const max = values[n-1];
     const variance = values.reduce((s,v)=>s+Math.pow(v-mean,2),0)/(n-1||1);
     const std = Math.sqrt(variance);
+    const p10 = percentile(values,0.1);
+    const p90 = percentile(values,0.9);
+    const q1  = percentile(values,0.25);
+    const q3  = percentile(values,0.75);
+    const cv  = mean ? std/mean : 0;
+    return {n,values,mean,median,min,max,std,p10,p90,q1,q3,cv};
+  }
 
-    function percentile(p){
-      if(n===1) return values[0];
-      const idx = (n-1)*p;
-      const lo = Math.floor(idx);
-      const hi = Math.ceil(idx);
-      if(lo===hi) return values[lo];
-      return values[lo] + (values[hi]-values[lo])*(idx-lo);
-    }
-    const p10 = percentile(0.1);
-    const p90 = percentile(0.9);
-    const cv = mean ? std/mean : 0;
-
-    return {n,values,mean,median,min,max,std,p10,p90,cv};
+  function computeCtTargetSeconds(){
+    const pcd   = parseFloat(pcdInput.value)||0;
+    const hours = Math.min(Math.max(parseFloat(hInput.value)||8,1),24);
+    if(pcd<=0) return null;
+    const secondsPerDay = hours*3600;
+    return secondsPerDay/pcd; // CT objetivo en segundos
   }
 
   function renderOverview(){
@@ -846,6 +900,48 @@
         <td>${contractUnits>0?`<span class="badge ${badgeClass}">${badgeText}</span>`:'-'}</td>
       `;
       overviewBody.appendChild(tr);
+    });
+  }
+
+  function renderStatsDetail(){
+    statsBody.innerHTML='';
+    const groups = groupByProcess();
+    const ctTarget = computeCtTargetSeconds();
+
+    groups.forEach((arr,key)=>{
+      const [proc,mode] = key.split('||');
+      const st = calcStats(arr);
+      if(!st) return;
+
+      let cp='-', cpk='-';
+      if(ctTarget && st.std>0){
+        const USL = ctTarget;
+        const LSL = 0;
+        cp  = (USL-LSL)/(6*st.std);
+        const cpu = (USL-st.mean)/(3*st.std);
+        const cpl = (st.mean-LSL)/(3*st.std);
+        cpk = Math.min(cpu,cpl);
+        cp  = cp.toFixed(2);
+        cpk = cpk.toFixed(2);
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${proc}</td>
+        <td>${mode}</td>
+        <td>${st.n}</td>
+        <td>${formatSecs(st.mean)}</td>
+        <td>${formatSecs(st.median)}</td>
+        <td>${formatSecs(st.p10)}</td>
+        <td>${formatSecs(st.p90)}</td>
+        <td>${formatSecs(st.min)}</td>
+        <td>${formatSecs(st.max)}</td>
+        <td>${formatSecs(st.std)}</td>
+        <td>${(st.cv*100).toFixed(1)}</td>
+        <td>${cp}</td>
+        <td>${cpk}</td>
+      `;
+      statsBody.appendChild(tr);
     });
   }
 
@@ -916,6 +1012,8 @@
       return;
     }
 
+    const ctTarget = computeCtTargetSeconds();
+
     groups.forEach((arr,key)=>{
       const [proc,mode] = key.split('||');
       const st = calcStats(arr);
@@ -940,7 +1038,7 @@
         sampleMsg = `Sample size ${n}/${recN} – too low, keep measuring.`;
       }else if(ratio<0.9){
         sampleClass='focus-warn';
-        sampleMsg = `Sample size ${n}/${recN} – almost enough, 1–2 more sets would help.`;
+        sampleMsg = `Sample size ${n}/${recN} – almost enough, a couple more laps would help.`;
       }else{
         sampleClass='focus-good';
         sampleMsg = `Sample size ${n}/${recN} – good enough for a quick decision.`;
@@ -948,9 +1046,9 @@
 
       // variation
       let varClass='focus-warn';
-      let varMsg='Moderate variation – check method and operator.';
+      let varMsg='Moderate variation.';
       if(cv<0.08){varClass='focus-good';varMsg='Low variation – process looks stable.';}
-      else if(cv>0.2){varClass='focus-bad';varMsg='High variation – timings jump too much, process not stable.';}
+      else if(cv>0.2){varClass='focus-bad';varMsg='High variation – unstable timings.';}
 
       // symmetry
       const diff = Math.abs(mean-med);
@@ -958,7 +1056,22 @@
       let symMsg='Mean and median are close – data roughly symmetric.';
       if(diff>0.2*med){
         symClass='focus-warn';
-        symMsg='Mean and median are far apart – data skewed, watch for outliers.';
+        symMsg='Mean and median are far apart – skewed data, check outliers.';
+      }
+
+      // capability
+      let capClass='focus-warn';
+      let capMsg='No contract loaded – capability vs contract not evaluated.';
+      if(ctTarget && st.std>0){
+        const USL = ctTarget;
+        const LSL = 0;
+        const cp  = (USL-LSL)/(6*st.std);
+        const cpu = (USL-mean)/(3*st.std);
+        const cpl = (mean-LSL)/(3*st.std);
+        const cpk = Math.min(cpu,cpl);
+        if(cpk<1.0){capClass='focus-bad';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Process not capable – focus here.`;}
+        else if(cpk<1.33){capClass='focus-warn';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Borderline capability – reduce variation.`;}
+        else{capClass='focus-good';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Process capable vs contract.`;}
       }
 
       const block = document.createElement('div');
@@ -966,11 +1079,246 @@
       block.innerHTML = `
         <div style="font-weight:600;margin-bottom:2px;">${proc} (${mode})</div>
         <div class="focus-line ${sampleClass}">${sampleMsg}</div>
-        <div class="focus-line ${varClass}">Std dev ≈ ${formatSecs(st.std)} s (${(cv*100).toFixed(1)}% of mean) – ${varMsg}</div>
+        <div class="focus-line ${varClass}">Std dev ≈ ${formatSecs(st.std)} s (${(cv*100).toFixed(1)}% of mean). ${varMsg}</div>
         <div class="focus-line ${symClass}">Mean ≈ ${formatSecs(mean)} s, Median ≈ ${formatSecs(med)} s. ${symMsg}</div>
+        <div class="focus-line ${capClass}">${capMsg}</div>
       `;
       statsFocusDiv.appendChild(block);
     });
+  }
+
+  // ===== Simple charts (time series + histogram) =====
+  function updateChartOptions(){
+    const groups = groupByProcess();
+    const previous = chartSelect.value;
+    chartSelect.innerHTML='';
+    if(!groups.size){
+      const opt = document.createElement('option');
+      opt.value='';
+      opt.textContent='No process yet';
+      chartSelect.appendChild(opt);
+      drawTimeSeries(null,null);
+      drawHistogram(null,null);
+      return;
+    }
+    let firstKey=null;
+    groups.forEach((_,key)=>{
+      if(!firstKey) firstKey=key;
+      const opt = document.createElement('option');
+      opt.value=key;
+      const [p,m]=key.split('||');
+      opt.textContent=`${p} (${m})`;
+      chartSelect.appendChild(opt);
+    });
+    if(previous && groups.has(previous)){
+      chartSelect.value=previous;
+    }else{
+      chartSelect.value=firstKey;
+    }
+    renderCharts();
+  }
+
+  function renderCharts(){
+    const key = chartSelect.value;
+    const groups = groupByProcess();
+    if(!key || !groups.has(key)){
+      drawTimeSeries(null,null);
+      drawHistogram(null,null);
+      return;
+    }
+    const arr = groups.get(key);
+    const st  = calcStats(arr);
+    drawTimeSeries(arr,st);
+    drawHistogram(arr,st);
+  }
+
+  function drawTimeSeries(arr,st){
+    const ctx = timeSeriesCanvas.getContext('2d');
+    const w = timeSeriesCanvas.width;
+    const h = timeSeriesCanvas.height;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = '#020b1a';
+    ctx.fillRect(0,0,w,h);
+
+    if(!arr || !arr.length || !st){
+      ctx.fillStyle='#607d8b';
+      ctx.font='12px system-ui';
+      ctx.fillText('Need at least 3 samples for chart.',10,20);
+      return;
+    }
+
+    const vals = st.values;
+    let min = st.min;
+    let max = st.max;
+    if(min===max){min-=0.5;max+=0.5;}
+    const padL=35,padR=8,padT=10,padB=18;
+    const innerW = w-padL-padR;
+    const innerH = h-padT-padB;
+
+    function yScale(v){
+      return padT + innerH*(1-(v-min)/(max-min));
+    }
+    function xScale(i){
+      if(vals.length===1) return padL+innerW/2;
+      return padL + innerW*(i/(vals.length-1));
+    }
+
+    // grid horizontal
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let g=0;g<=4;g++){
+      const y = padT + innerH*g/4;
+      ctx.moveTo(padL,y);
+      ctx.lineTo(w-padR,y);
+    }
+    ctx.stroke();
+
+    // axis
+    ctx.strokeStyle='rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(padL,padT);
+    ctx.lineTo(padL,h-padB);
+    ctx.lineTo(w-padR,h-padB);
+    ctx.stroke();
+
+    // y labels
+    ctx.fillStyle='#90a4ae';
+    ctx.font='10px system-ui';
+    for(let g=0;g<=4;g++){
+      const val = min + (max-min)*g/4;
+      const y = padT + innerH*(1-g/4);
+      ctx.fillText(formatSecs(val),2,y+3);
+    }
+
+    // data line
+    ctx.strokeStyle='#29b6f6';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    vals.forEach((v,i)=>{
+      const x=xScale(i),y=yScale(v);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // points
+    ctx.fillStyle='#29b6f6';
+    vals.forEach((v,i)=>{
+      const x=xScale(i),y=yScale(v);
+      ctx.beginPath();
+      ctx.arc(x,y,2.2,0,Math.PI*2);
+      ctx.fill();
+    });
+
+    // mean & median & ±3σ
+    ctx.setLineDash([4,3]);
+    if(st.std>0){
+      const ucl = st.mean+3*st.std;
+      const lcl = st.mean-3*st.std;
+      ctx.strokeStyle='rgba(255,82,82,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(padL,yScale(ucl));
+      ctx.lineTo(w-padR,yScale(ucl));
+      ctx.moveTo(padL,yScale(lcl));
+      ctx.lineTo(w-padR,yScale(lcl));
+      ctx.stroke();
+    }
+    // mean
+    ctx.strokeStyle='rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(padL,yScale(st.mean));
+    ctx.lineTo(w-padR,yScale(st.mean));
+    ctx.stroke();
+    // median
+    ctx.strokeStyle='rgba(0,230,118,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(padL,yScale(st.median));
+    ctx.lineTo(w-padR,yScale(st.median));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle='#cfd8dc';
+    ctx.font='10px system-ui';
+    ctx.fillText('Mean',w-padR-34,yScale(st.mean)-2);
+    ctx.fillStyle='#00e676';
+    ctx.fillText('Median',w-padR-44,yScale(st.median)-2);
+  }
+
+  function drawHistogram(arr,st){
+    const ctx = histCanvas.getContext('2d');
+    const w = histCanvas.width;
+    const h = histCanvas.height;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#020b1a';
+    ctx.fillRect(0,0,w,h);
+
+    if(!arr || !arr.length || !st){
+      ctx.fillStyle='#607d8b';
+      ctx.font='12px system-ui';
+      ctx.fillText('Need more samples for histogram.',10,20);
+      return;
+    }
+
+    const vals = st.values;
+    let min = st.min;
+    let max = st.max;
+    if(min===max){min-=0.5;max+=0.5;}
+    const padL=30,padR=8,padT=8,padB=20;
+    const innerW = w-padL-padR;
+    const innerH = h-padT-padB;
+    const binsCount = 8;
+    const binSize = (max-min)/binsCount;
+    const bins = new Array(binsCount).fill(0);
+    vals.forEach(v=>{
+      let idx = Math.floor((v-min)/binSize);
+      if(idx===binsCount) idx=binsCount-1;
+      bins[idx]++;
+    });
+    const maxBin = Math.max(...bins);
+
+    // axes
+    ctx.strokeStyle='rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(padL,padT);
+    ctx.lineTo(padL,h-padB);
+    ctx.lineTo(w-padR,h-padB);
+    ctx.stroke();
+
+    // bars
+    const barW = innerW/binsCount;
+    ctx.fillStyle='#29b6f6';
+    bins.forEach((c,i)=>{
+      const x = padL + i*barW + 1;
+      const barH = maxBin? innerH*(c/maxBin) : 0;
+      const y = (h-padB) - barH;
+      ctx.fillRect(x,y,barW-2,barH);
+    });
+
+    // x labels (min, median, max)
+    ctx.fillStyle='#90a4ae';
+    ctx.font='10px system-ui';
+    ctx.fillText(formatSecs(min),padL, h-8);
+    ctx.fillText(formatSecs(max), w-padR-32, h-8);
+    ctx.fillText(formatSecs(st.median), padL+innerW/2-16, h-8);
+
+    // median line
+    const medX = padL + innerW*( (st.median-min)/(max-min) );
+    ctx.strokeStyle='#00e676';
+    ctx.beginPath();
+    ctx.moveTo(medX,padT);
+    ctx.lineTo(medX,h-padB);
+    ctx.stroke();
+
+    // p10 / p90 markers
+    const p10x = padL + innerW*( (st.p10-min)/(max-min) );
+    const p90x = padL + innerW*( (st.p90-min)/(max-min) );
+    ctx.strokeStyle='rgba(255,241,118,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(p10x,padT);
+    ctx.lineTo(p10x,h-padB);
+    ctx.moveTo(p90x,padT);
+    ctx.lineTo(p90x,h-padB);
+    ctx.stroke();
   }
 
   async function copyToClipboard(text){
@@ -979,7 +1327,6 @@
       await navigator.clipboard.writeText(text);
       alert('Copied.');
     }catch(e){
-      // fallback
       const ta = document.createElement('textarea');
       ta.value = text;
       document.body.appendChild(ta);
@@ -1025,13 +1372,30 @@
       const st = calcStats(arr);
       if(!st) return;
       lines.push(
-        `${proc} (${mode})\tN=${st.n}\tMean=${formatSecs(st.mean)}s\tMedian=${formatSecs(st.median)}s\tStd=${formatSecs(st.std)}s\tMin=${formatSecs(st.min)}s\tMax=${formatSecs(st.max)}s`
+        `${proc} (${mode})\tN=${st.n}\tMean=${formatSecs(st.mean)}s\tMedian=${formatSecs(st.median)}s\tStd=${formatSecs(st.std)}s\tP10=${formatSecs(st.p10)}s\tP90=${formatSecs(st.p90)}s`
       );
     });
     copyToClipboard(lines.join('\n'));
   });
 
-  // initial render
+  function renderAll(){
+    renderDataTable();
+    renderOverview();
+    renderStatsDetail();
+    renderContractSummary();
+    renderStatsFocus();
+    updateChartOptions();
+  }
+
+  chartSelect.addEventListener('change',renderCharts);
+  effInput.addEventListener('change',renderAll);
+  pcdInput.addEventListener('change',renderAll);
+  hInput.addEventListener('change',renderAll);
+  dInput.addEventListener('change',renderAll);
+  capViewSel.addEventListener('change',renderAll);
+
+  // initial
+  updateDisplay();
   renderAll();
 })();
 </script>
