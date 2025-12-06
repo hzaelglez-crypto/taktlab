@@ -659,16 +659,22 @@
 
     const mode = modeSelect.value;
     const secs = Math.max(elapsed/1000,0);
+if(running && modeSelect.value === 'MLD'){
+  const secs = elapsed / 1000;
 
-    if(running && mode === 'MLD'){
-      if(pendingT1 === null){
-        t1Indicator.textContent = formatSecs(secs)+' s';
-      }else{
-        const t2 = Math.max(secs - pendingT1,0);
-        t2Indicator.textContent = formatSecs(t2)+' s';
-      }
-    }else if(running && mode === 'CT'){
-      t1Indicator.textContent = formatSecs(secs)+' s';
+  if(pendingT1 === null){
+    // Estamos midiendo T1
+    t1Indicator.textContent = formatSecs(secs) + ' s';
+  } else {
+    // Estamos midiendo T2 (cronómetro arrancó nuevamente en 0)
+    const t2 = secs;
+    t2Indicator.textContent = formatSecs(t2) + ' s';
+  }
+}
+else if(running && modeSelect.value === 'CT'){
+  const secs = elapsed / 1000;
+  t1Indicator.textContent = formatSecs(secs) + ' s';
+}
     }
 
     timerId = requestAnimationFrame(tick);
