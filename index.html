@@ -41,7 +41,7 @@
     padding:12px 10px 40px;
   }
 
-  /* ===== Sticky timer bar ===== */
+  /* ===== Sticky ONLY timer bar (title + display + Start/Lap) ===== */
   .sticky-timer-bar{
     position:sticky;
     top:0;
@@ -106,12 +106,11 @@
     color:var(--text-soft);
   }
 
-  /* timer panel */
   .timer-card{
     background:var(--bg-card);
     border-radius:18px;
     border:1px solid var(--border-soft);
-    padding:6px 10px 12px;
+    padding:6px 10px 10px;
     box-shadow:0 8px 18px rgba(0,0,0,.45);
   }
 
@@ -126,7 +125,7 @@
   .btn-row-main{
     display:flex;
     gap:10px;
-    margin-bottom:4px;
+    margin-bottom:2px;
   }
   .btn{
     border:none;
@@ -147,7 +146,30 @@
   }
   .btn-start{background:var(--btn-green);}
   .btn-lap{background:var(--btn-orange);}
-  .btn-secondary{background:var(--btn-grey); flex:0 0 auto;}
+
+  .flash{
+    animation:flash-bg .12s ease-out;
+  }
+  @keyframes flash-bg{
+    from{background:rgba(255,255,255,.18);}
+    to{background:transparent;}
+  }
+
+  /* Rest of page */
+  .content-section{margin-top:10px;}
+
+  .section-card{
+    background:var(--bg-card);
+    border-radius:18px;
+    border:1px solid var(--border-soft);
+    padding:10px 10px 12px;
+    margin-bottom:10px;
+  }
+  .section-title{
+    font-size:.9rem;
+    font-weight:600;
+    margin-bottom:6px;
+  }
 
   .mode-row{
     display:flex;
@@ -168,15 +190,13 @@
     font-size:.78rem;
     min-width:70px;
   }
-  .mode-row input[type="number"]{
-    width:70px;
-  }
+  .mode-row input[type="number"]{width:70px;}
 
-  /* T1/T2 mini indicators */
+  /* T1/T2 mini indicators (NO sticky, van en sección de controles) */
   .mini-t12-wrapper{
     display:flex;
     gap:8px;
-    margin-top:6px;
+    margin-top:8px;
   }
   .mini-t12{
     flex:1;
@@ -207,7 +227,7 @@
     border-right-color:var(--accent-green);
     transform-origin:50% 50%;
     animation:ring-spin 1.2s linear infinite;
-    opacity:.1;
+    opacity:.2;
   }
   .mini-ring.paused::before{
     animation-play-state:paused;
@@ -219,24 +239,6 @@
   }
   .mini-label{font-size:.72rem;color:var(--text-soft);}
   .mini-value{font-size:.95rem;font-weight:600;}
-
-  /* layout for rest of page */
-  .content-section{
-    margin-top:10px;
-  }
-
-  .section-card{
-    background:var(--bg-card);
-    border-radius:18px;
-    border:1px solid var(--border-soft);
-    padding:10px 10px 12px;
-    margin-bottom:10px;
-  }
-  .section-title{
-    font-size:.9rem;
-    font-weight:600;
-    margin-bottom:6px;
-  }
 
   table{
     width:100%;
@@ -290,6 +292,17 @@
   }
   .btn-small:active{transform:translateY(1px);}
 
+  .btn-edit,.btn-del{
+    padding:2px 6px;
+    border-radius:8px;
+    font-size:.7rem;
+    border:1px solid rgba(255,255,255,.2);
+    cursor:pointer;
+    background:transparent;
+  }
+  .btn-edit{color:#81d4fa;}
+  .btn-del{color:#ff8a80;}
+
   .stats-focus{
     font-size:.74rem;
     line-height:1.3;
@@ -310,22 +323,6 @@
     font-size:.65rem;
     color:var(--text-muted);
     text-align:right;
-  }
-
-  .flash{
-    animation:flash-bg .12s ease-out;
-  }
-  @keyframes flash-bg{
-    from{background:rgba(255,255,255,.18);}
-    to{background:transparent;}
-  }
-
-  /* Stats detail table */
-  .stats-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-    gap:4px;
-    font-size:.72rem;
   }
 
   /* Charts */
@@ -363,7 +360,7 @@
 <body>
 <div class="page">
 
-  <!-- STICKY TIMER BAR -->
+  <!-- STICKY BAR: SOLO cronómetro + Start/Lap -->
   <div class="sticky-timer-bar">
     <div class="top-row">
       <div class="logo-circle">
@@ -381,7 +378,15 @@
         <button class="btn btn-start" id="btnStart">Start</button>
         <button class="btn btn-lap" id="btnLap">LAP</button>
       </div>
+    </div>
+  </div>
 
+  <!-- RESTO (NO STICKY) -->
+  <div class="content-section">
+
+    <!-- Controles de medición + T1/T2 -->
+    <div class="section-card">
+      <div class="section-title">Measurement Setup</div>
       <div class="mode-row">
         <div>
           <label for="processName">Process</label><br/>
@@ -421,7 +426,7 @@
       </div>
 
       <!-- T1 / T2 indicators -->
-      <div class="mini-t12-wrapper" id="t12Wrapper">
+      <div class="mini-t12-wrapper">
         <div class="mini-t12">
           <div class="mini-ring paused" id="ringT1"></div>
           <div>
@@ -438,11 +443,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- REST OF CONTENT -->
-  <div class="content-section">
-
     <!-- Process Capacity Overview -->
     <div class="section-card">
       <div class="section-title">Process Capacity Overview</div>
@@ -458,12 +458,11 @@
             <th>% vs contract</th>
           </tr>
         </thead>
-        <tbody id="overviewBody">
-        </tbody>
+        <tbody id="overviewBody"></tbody>
       </table>
     </div>
 
-    <!-- Stats detail: median, percentiles, Cp/Cpk etc -->
+    <!-- Stats detail -->
     <div class="section-card">
       <div class="section-title">Statistical Detail (per process)</div>
       <div style="max-height:260px;overflow:auto;">
@@ -496,7 +495,7 @@
       <div id="contractSummary" style="font-size:.78rem;"></div>
     </div>
 
-    <!-- Charts like mini-Minitab -->
+    <!-- Charts tipo mini-Minitab -->
     <div class="section-card">
       <div class="section-title">Charts (selected process)</div>
       <div style="margin-bottom:6px;font-size:.75rem;">
@@ -520,11 +519,11 @@
       <div class="section-title">Stats Focus</div>
       <div class="stats-focus" id="statsFocus"></div>
       <div style="margin-top:6px;font-size:.68rem;color:var(--text-muted);">
-        Comments are simplified on purpose: stable / unstable, few / enough samples, capable / not capable.
+        Simple language on purpose: few / enough samples, low / high variation, close to normal / not normal, capable / not capable.
       </div>
     </div>
 
-    <!-- Copy buttons -->
+    <!-- Data controls -->
     <div class="section-card">
       <div class="section-title">Data Controls</div>
       <div class="btn-row-secondary">
@@ -535,7 +534,7 @@
       </div>
     </div>
 
-    <!-- Raw data table -->
+    <!-- Raw Time Data -->
     <div class="section-card">
       <div class="section-title">Raw Time Data</div>
       <div style="max-height:320px;overflow:auto;">
@@ -550,6 +549,7 @@
               <th>T1 (s)</th>
               <th>T2 (s)</th>
               <th>Total (s)</th>
+              <th>Edit</th>
               <th>Del</th>
             </tr>
           </thead>
@@ -564,7 +564,6 @@
     Created by Roberto González
   </div>
 </div>
-
 <script>
 (function(){
   const display = document.getElementById('display');
@@ -580,6 +579,11 @@
   const dInput       = document.getElementById('daysPerWeek');
   const capViewSel   = document.getElementById('capView');
 
+  const ringT1 = document.getElementById('ringT1');
+  const ringT2 = document.getElementById('ringT2');
+  const t1Indicator = document.getElementById('t1Indicator');
+  const t2Indicator = document.getElementById('t2Indicator');
+
   const overviewBody   = document.getElementById('overviewBody');
   const statsBody      = document.getElementById('statsBody');
   const contractSummary= document.getElementById('contractSummary');
@@ -591,24 +595,18 @@
   const btnAddMan   = document.getElementById('btnAddManualLap');
   const btnReset    = document.getElementById('btnReset');
 
-  const ringT1 = document.getElementById('ringT1');
-  const ringT2 = document.getElementById('ringT2');
-  const t1Indicator = document.getElementById('t1Indicator');
-  const t2Indicator = document.getElementById('t2Indicator');
-
-  const chartSelect = document.getElementById('chartProcessSelect');
+  const chartSelect      = document.getElementById('chartProcessSelect');
   const timeSeriesCanvas = document.getElementById('timeSeriesCanvas');
-  const histCanvas = document.getElementById('histCanvas');
+  const histCanvas       = document.getElementById('histCanvas');
 
   let running = false;
   let startTime = 0;
   let elapsed = 0;
   let timerId = null;
 
-  let laps = []; // {id, process, mode, status, note, t1, t2, total}
+  let laps = []; // {id,process,mode,status,note,t1,t2,total}
   let nextId = 1;
-
-  let pendingT1 = null; // for MLD
+  let pendingT1 = null; // para MLD
 
   function pad2(n){return n<10?'0'+n:''+n;}
   function formatTime(ms){
@@ -627,6 +625,27 @@
     display.textContent = formatTime(elapsed);
   }
 
+  function refreshRingStates(){
+    const mode = modeSelect.value;
+    if(!running){
+      ringT1.classList.add('paused');
+      ringT2.classList.add('paused');
+      return;
+    }
+    if(mode === 'CT'){
+      ringT1.classList.remove('paused');
+      ringT2.classList.add('paused');
+    }else{
+      if(pendingT1 === null){
+        ringT1.classList.remove('paused');
+        ringT2.classList.add('paused');
+      }else{
+        ringT1.classList.add('paused');
+        ringT2.classList.remove('paused');
+      }
+    }
+  }
+
   function tick(){
     const now = performance.now();
     elapsed = now - startTime;
@@ -638,6 +657,8 @@
         const t2 = (elapsed/1000) - pendingT1;
         t2Indicator.textContent = formatSecs(t2)+' s';
       }
+    }else if(running && modeSelect.value === 'CT'){
+      t1Indicator.textContent = formatSecs(elapsed/1000)+' s';
     }
     timerId = requestAnimationFrame(tick);
   }
@@ -648,8 +669,7 @@
     startTime = performance.now() - elapsed;
     timerId = requestAnimationFrame(tick);
     btnStart.textContent = 'Pause';
-    ringT1.classList.remove('paused');
-    ringT2.classList.remove('paused');
+    refreshRingStates();
   }
 
   function pause(){
@@ -658,8 +678,7 @@
     cancelAnimationFrame(timerId);
     timerId = null;
     btnStart.textContent = 'Start';
-    ringT1.classList.add('paused');
-    ringT2.classList.add('paused');
+    refreshRingStates();
   }
 
   btnStart.addEventListener('click',()=>{
@@ -694,7 +713,7 @@
 
     if(manualData){
       const {t1,t2,total} = manualData;
-      laps.push({id:nextId++, process:proc, mode, status, note, t1, t2, total});
+      laps.push({id:nextId++,process:proc,mode,status,note,t1,t2,total});
       renderAll();
       return;
     }
@@ -717,35 +736,29 @@
       t1Indicator.textContent='0.0 s';
       t2Indicator.textContent='0.0 s';
       pendingT1 = null;
+      refreshRingStates();
       renderAll();
       return;
     }
 
-    // Machine + Load/Unload
+    // Machine & Load/Unload (T1 primero, luego T2)
     if(pendingT1 === null){
       pendingT1 = seconds;
       t1Indicator.textContent = formatSecs(pendingT1)+' s';
       elapsed = 0;
       startTime = performance.now();
+      refreshRingStates();
     }else{
       const t2 = seconds;
       const t1 = pendingT1;
       const total = t1 + t2;
-      laps.push({
-        id:nextId++,
-        process:proc,
-        mode,
-        status,
-        note,
-        t1,
-        t2,
-        total
-      });
+      laps.push({id:nextId++,process:proc,mode,status,note,t1,t2,total});
       pendingT1 = null;
       t1Indicator.textContent='0.0 s';
       t2Indicator.textContent='0.0 s';
       elapsed = 0;
       updateDisplay();
+      refreshRingStates();
       renderAll();
     }
   }
@@ -774,35 +787,17 @@
     pendingT1 = null;
     t1Indicator.textContent='0.0 s';
     t2Indicator.textContent='0.0 s';
+    refreshRingStates();
     renderAll();
   });
 
-  function renderDataTable(){
-    dataBody.innerHTML='';
-    laps.forEach((lap,i)=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${lap.process}</td>
-        <td>${lap.mode}</td>
-        <td>${lap.status||''}</td>
-        <td>${lap.note||''}</td>
-        <td>${formatSecs(lap.t1)}</td>
-        <td>${formatSecs(lap.t2)}</td>
-        <td>${formatSecs(lap.total)}</td>
-        <td><button data-id="${lap.id}" class="btn-del" style="background:transparent;border:none;color:#ff8a80;cursor:pointer;font-weight:700;">X</button></td>
-      `;
-      dataBody.appendChild(tr);
-    });
-
-    dataBody.querySelectorAll('.btn-del').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        const id = parseInt(btn.getAttribute('data-id'),10);
-        laps = laps.filter(l=>l.id!==id);
-        renderAll();
-      });
-    });
-  }
+  modeSelect.addEventListener('change',()=>{
+    // cambiar comportamiento CT vs MLD
+    pendingT1 = null;
+    t1Indicator.textContent='0.0 s';
+    t2Indicator.textContent='0.0 s';
+    refreshRingStates();
+  });
 
   function groupByProcess(){
     const map = new Map();
@@ -848,7 +843,77 @@
     const hours = Math.min(Math.max(parseFloat(hInput.value)||8,1),24);
     if(pcd<=0) return null;
     const secondsPerDay = hours*3600;
-    return secondsPerDay/pcd; // CT objetivo en segundos
+    return secondsPerDay/pcd;
+  }
+
+  function renderDataTable(){
+    dataBody.innerHTML='';
+    const statusOptions = ['','Starved','Blocked','DT Maint'];
+
+    laps.forEach((lap,i)=>{
+      const tr = document.createElement('tr');
+      const statusSelectHtml = `
+        <select class="status-select" data-id="${lap.id}">
+          ${statusOptions.map(opt=>{
+            const sel = opt===lap.status?'selected':'';
+            return `<option value="${opt}" ${sel}>${opt}</option>`;
+          }).join('')}
+        </select>
+      `;
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${lap.process}</td>
+        <td>${lap.mode}</td>
+        <td>${statusSelectHtml}</td>
+        <td><input type="text" class="note-input" data-id="${lap.id}" value="${lap.note||''}" style="width:120px;background:#020b1a;border-radius:6px;border:1px solid var(--border-soft);color:var(--text-soft);font-size:.72rem;padding:2px 4px;"></td>
+        <td>${formatSecs(lap.t1)}</td>
+        <td>${formatSecs(lap.t2)}</td>
+        <td>${formatSecs(lap.total)}</td>
+        <td><button class="btn-edit" data-id="${lap.id}">Edit</button></td>
+        <td><button class="btn-del" data-id="${lap.id}">X</button></td>
+      `;
+      dataBody.appendChild(tr);
+    });
+
+    // listeners
+    dataBody.querySelectorAll('.btn-del').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const id = parseInt(btn.dataset.id,10);
+        laps = laps.filter(l=>l.id!==id);
+        renderAll();
+      });
+    });
+
+    dataBody.querySelectorAll('.btn-edit').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const id = parseInt(btn.dataset.id,10);
+        const lap = laps.find(l=>l.id===id);
+        if(!lap) return;
+        const t1 = parseFloat(prompt('Edit T1 (s)', lap.t1.toFixed(2)));
+        const t2 = parseFloat(prompt('Edit T2 (s)', lap.t2.toFixed(2)));
+        if(isNaN(t1) && isNaN(t2)) return;
+        if(!isNaN(t1)) lap.t1 = t1;
+        if(!isNaN(t2)) lap.t2 = t2;
+        lap.total = lap.t1 + lap.t2;
+        renderAll();
+      });
+    });
+
+    dataBody.querySelectorAll('.status-select').forEach(sel=>{
+      sel.addEventListener('change',()=>{
+        const id = parseInt(sel.dataset.id,10);
+        const lap = laps.find(l=>l.id===id);
+        if(lap) lap.status = sel.value;
+      });
+    });
+
+    dataBody.querySelectorAll('.note-input').forEach(inp=>{
+      inp.addEventListener('change',()=>{
+        const id = parseInt(inp.dataset.id,10);
+        const lap = laps.find(l=>l.id===id);
+        if(lap) lap.note = inp.value;
+      });
+    });
   }
 
   function renderOverview(){
@@ -862,9 +927,9 @@
 
     groups.forEach((arr,key)=>{
       const [proc,mode] = key.split('||');
-      const stats = calcStats(arr);
-      if(!stats) return;
-      const ctMed = stats.median;
+      const st = calcStats(arr);
+      if(!st) return;
+      const ctMed = st.median;
       let cap100 = 0;
       if(ctMed>0){
         const perHour = 3600/ctMed;
@@ -893,7 +958,7 @@
       tr.innerHTML = `
         <td>${proc}</td>
         <td>${mode}</td>
-        <td>${stats.n}</td>
+        <td>${st.n}</td>
         <td>${formatSecs(ctMed)}</td>
         <td>${cap100?cap100.toFixed(1):'-'}</td>
         <td>${capEff?capEff.toFixed(1):'-'}</td>
@@ -963,9 +1028,9 @@
 
     groups.forEach((arr,key)=>{
       const [proc,mode] = key.split('||');
-      const stats = calcStats(arr);
-      if(!stats) return;
-      const ctMed = stats.median;
+      const st = calcStats(arr);
+      if(!st) return;
+      const ctMed = st.median;
       if(!ctMed) return;
       let perHour = 3600/ctMed;
       let cap100 = 0;
@@ -1023,7 +1088,7 @@
       const mean = st.mean;
       const med = st.median;
 
-      // sample size heuristic
+      // tamaño de muestra recomendado según variación
       let recN;
       if(cv<=0.10) recN = 10;
       else if(cv<=0.20) recN = 15;
@@ -1044,24 +1109,24 @@
         sampleMsg = `Sample size ${n}/${recN} – good enough for a quick decision.`;
       }
 
-      // variation
+      // variación
       let varClass='focus-warn';
       let varMsg='Moderate variation.';
       if(cv<0.08){varClass='focus-good';varMsg='Low variation – process looks stable.';}
       else if(cv>0.2){varClass='focus-bad';varMsg='High variation – unstable timings.';}
 
-      // symmetry
+      // simetría / normalidad
       const diff = Math.abs(mean-med);
       let symClass='focus-good';
-      let symMsg='Mean and median are close – data roughly symmetric.';
+      let symMsg='Mean and median are close – distribution close to normal.';
       if(diff>0.2*med){
         symClass='focus-warn';
-        symMsg='Mean and median are far apart – skewed data, check outliers.';
+        symMsg='Mean and median are far – non-normal data, check outliers or method.';
       }
 
-      // capability
+      // capacidad
       let capClass='focus-warn';
-      let capMsg='No contract loaded – capability vs contract not evaluated.';
+      let capMsg='No contract loaded – capability vs target not evaluated.';
       if(ctTarget && st.std>0){
         const USL = ctTarget;
         const LSL = 0;
@@ -1071,7 +1136,7 @@
         const cpk = Math.min(cpu,cpl);
         if(cpk<1.0){capClass='focus-bad';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Process not capable – focus here.`;}
         else if(cpk<1.33){capClass='focus-warn';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Borderline capability – reduce variation.`;}
-        else{capClass='focus-good';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Process capable vs contract.`;}
+        else{capClass='focus-good';capMsg=`Cp=${cp.toFixed(2)}, Cpk=${cpk.toFixed(2)} → Process capable vs target.`;}
       }
 
       const block = document.createElement('div');
@@ -1087,7 +1152,7 @@
     });
   }
 
-  // ===== Simple charts (time series + histogram) =====
+  // ===== Gráficas =====
   function updateChartOptions(){
     const groups = groupByProcess();
     const previous = chartSelect.value;
@@ -1174,7 +1239,7 @@
     }
     ctx.stroke();
 
-    // axis
+    // eje
     ctx.strokeStyle='rgba(255,255,255,0.4)';
     ctx.beginPath();
     ctx.moveTo(padL,padT);
@@ -1182,7 +1247,7 @@
     ctx.lineTo(w-padR,h-padB);
     ctx.stroke();
 
-    // y labels
+    // labels Y
     ctx.fillStyle='#90a4ae';
     ctx.font='10px system-ui';
     for(let g=0;g<=4;g++){
@@ -1191,7 +1256,7 @@
       ctx.fillText(formatSecs(val),2,y+3);
     }
 
-    // data line
+    // línea datos
     ctx.strokeStyle='#29b6f6';
     ctx.lineWidth=2;
     ctx.beginPath();
@@ -1201,7 +1266,7 @@
     });
     ctx.stroke();
 
-    // points
+    // puntos
     ctx.fillStyle='#29b6f6';
     vals.forEach((v,i)=>{
       const x=xScale(i),y=yScale(v);
@@ -1210,7 +1275,7 @@
       ctx.fill();
     });
 
-    // mean & median & ±3σ
+    // mean, median, ±3σ
     ctx.setLineDash([4,3]);
     if(st.std>0){
       const ucl = st.mean+3*st.std;
@@ -1276,7 +1341,7 @@
     });
     const maxBin = Math.max(...bins);
 
-    // axes
+    // ejes
     ctx.strokeStyle='rgba(255,255,255,0.4)';
     ctx.beginPath();
     ctx.moveTo(padL,padT);
@@ -1284,7 +1349,7 @@
     ctx.lineTo(w-padR,h-padB);
     ctx.stroke();
 
-    // bars
+    // barras
     const barW = innerW/binsCount;
     ctx.fillStyle='#29b6f6';
     bins.forEach((c,i)=>{
@@ -1294,14 +1359,37 @@
       ctx.fillRect(x,y,barW-2,barH);
     });
 
-    // x labels (min, median, max)
+    // curva normal teórica (aprox)
+    if(st.std>0){
+      const points = 80;
+      let maxPdf=0;
+      const pdfVals=[];
+      for(let i=0;i<points;i++){
+        const xVal = min + (max-min)*i/(points-1);
+        const z = (xVal-st.mean)/st.std;
+        const pdf = Math.exp(-0.5*z*z);
+        pdfVals.push({xVal,pdf});
+        if(pdf>maxPdf) maxPdf=pdf;
+      }
+      ctx.strokeStyle='rgba(255,241,118,0.9)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      pdfVals.forEach((p,i)=>{
+        const x = padL + innerW*( (p.xVal-min)/(max-min) );
+        const y = (h-padB) - innerH*(p.pdf/maxPdf);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    }
+
+    // labels X
     ctx.fillStyle='#90a4ae';
     ctx.font='10px system-ui';
     ctx.fillText(formatSecs(min),padL, h-8);
     ctx.fillText(formatSecs(max), w-padR-32, h-8);
     ctx.fillText(formatSecs(st.median), padL+innerW/2-16, h-8);
 
-    // median line
+    // median
     const medX = padL + innerW*( (st.median-min)/(max-min) );
     ctx.strokeStyle='#00e676';
     ctx.beginPath();
@@ -1309,7 +1397,7 @@
     ctx.lineTo(medX,h-padB);
     ctx.stroke();
 
-    // p10 / p90 markers
+    // P10 / P90
     const p10x = padL + innerW*( (st.p10-min)/(max-min) );
     const p90x = padL + innerW*( (st.p90-min)/(max-min) );
     ctx.strokeStyle='rgba(255,241,118,0.9)';
@@ -1394,8 +1482,9 @@
   dInput.addEventListener('change',renderAll);
   capViewSel.addEventListener('change',renderAll);
 
-  // initial
+  // init
   updateDisplay();
+  refreshRingStates();
   renderAll();
 })();
 </script>
