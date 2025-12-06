@@ -41,7 +41,7 @@
     padding-bottom: 48px;
   }
 
-  /* Top sticky bar with logo + credit */
+  /* Top bar (sin crédito arriba ahora) */
   .top-bar {
     position: sticky;
     top: 0;
@@ -52,14 +52,6 @@
     display: flex;
     align-items: center;
     gap: 10px;
-  }
-
-  .top-credit {
-    font-size: 0.65rem;
-    color: rgba(192, 204, 232, 0.85);
-    font-weight: 300;
-    margin-right: 6px;
-    white-space: nowrap;
   }
 
   .logo-circle {
@@ -117,6 +109,10 @@
     border-right-color: var(--accent-green);
     border-bottom-color: #cccccc;
     border-left-color: #cccccc;
+    /* Animación solo cuando tenga la clase .running */
+  }
+
+  .logo-ring.running {
     animation: logoSpin 3.2s linear infinite;
   }
 
@@ -144,7 +140,7 @@
   /* Sticky stopwatch bar (ONLY chrono + start + lap) */
   .sticky-panel {
     position: sticky;
-    top: 52px; /* below top-bar */
+    top: 52px; /* debajo del top-bar */
     z-index: 50;
     padding: 6px 12px 0;
     background: linear-gradient(to bottom, rgba(5, 11, 25, 0.98), rgba(5, 11, 25, 0.9));
@@ -481,8 +477,27 @@
   .footer-note {
     margin-top: 8px;
     text-align: right;
-    font-size: 0.6rem;
-    color: #6f7ca5;
+    font-size: 0.58rem;
+    color: rgba(111,124,165,0.8);
+  }
+
+  /* Tabla compacta para Cp/Cpk & percentiles */
+  .mini-cap-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+    font-size: 0.72rem;
+  }
+
+  .mini-cap-table th,
+  .mini-cap-table td {
+    border-bottom: 1px solid #1a2947;
+    padding: 3px 4px;
+    text-align: left;
+  }
+
+  .mini-cap-table th {
+    color: var(--text-soft);
   }
 
   /* Flash overlay for LAP feedback */
@@ -511,7 +526,6 @@
 
   <!-- TOP BAR -->
   <div class="top-bar">
-    <div class="top-credit">Created by Roberto Glez</div>
     <div class="logo-circle">
       <div class="logo-gear"></div>
       <div class="logo-ring"></div>
@@ -698,7 +712,7 @@
     <div class="card">
       <div class="card-header">
         <h2>Distribution &amp; Capability Plots</h2>
-        <small>Visual support for the stats above</small>
+        <small>Histogram, scatter &amp; Cp/Cpk bar</small>
       </div>
       <div class="field" style="margin-bottom:6px;">
         <label for="graphProcessSelect">Graph focus</label>
@@ -737,7 +751,7 @@
   const statsProcessSelect = document.getElementById("statsProcessSelect");
   const contractPcdInput = document.getElementById("contractPcd");
   const hoursPerDayInput = document.getElementById("hoursPerDay");
-  const daysPerWeekInput = document.getElementById("daysPerWeek"); // guardado por si lo usamos después
+  const daysPerWeekInput = document.getElementById("daysPerWeek"); // reserved
   const efficiencyInput = document.getElementById("efficiency");
   const t1Indicator = document.getElementById("t1Indicator");
   const t2Indicator = document.getElementById("t2Indicator");
@@ -754,6 +768,8 @@
   const histCanvas = document.getElementById("histCanvas");
   const xbarCanvas = document.getElementById("xbarCanvas");
   const capCanvas = document.getElementById("capCanvas");
+
+  const logoRing = document.querySelector(".logo-ring");
 
   let laps = [];
   let lapCounter = 0;
@@ -795,6 +811,7 @@
     lapPhase = "T1";
     tempT1 = null;
     setIndicators();
+    if (logoRing) logoRing.classList.add("running");
     timerInterval = setInterval(updateDisplay, 50);
   }
 
@@ -805,6 +822,7 @@
     isRunning = true;
     startPauseBtn.textContent = "Pause";
     setIndicators();
+    if (logoRing) logoRing.classList.add("running");
     timerInterval = setInterval(updateDisplay, 50);
   }
 
@@ -819,6 +837,7 @@
     t2Indicator.classList.remove("active");
     t1Indicator.classList.add("waiting");
     t2Indicator.classList.add("waiting");
+    if (logoRing) logoRing.classList.remove("running");
   }
 
   function resetTimerState() {
@@ -837,6 +856,7 @@
     t1Indicator.classList.remove("active");
     t2Indicator.classList.add("waiting");
     t2Indicator.classList.remove("active");
+    if (logoRing) logoRing.classList.remove("running");
   }
 
   function setIndicators() {
@@ -867,17 +887,14 @@
 
   function triggerFlash() {
     flashOverlay.classList.remove("flash-active");
-    // force reflow
     void flashOverlay.offsetWidth;
     flashOverlay.classList.add("flash-active");
   }
 
   function giveLapFeedback() {
-    // Vibración
     if (navigator.vibrate) {
       navigator.vibrate(50);
     }
-    // Flash rápido
     triggerFlash();
   }
 
@@ -912,7 +929,7 @@
     if (!isRunning || lastSegStart === null) return;
     const now = Date.now();
     let segMs = now - lastSegStart;
-    if (segMs < 150) return; // evitar fantasmas
+    if (segMs < 150) return;
     lastSegStart = now;
     const segSec = segMs / 1000;
 
@@ -923,7 +940,6 @@
       addLapRow(process, "CT", round1(segSec), null, round1(segSec));
       giveLapFeedback();
     } else {
-      // Machine & Load/Unload Time
       if (lapPhase === "T1") {
         tempT1 = segSec;
         lapPhase = "T2";
@@ -1257,8 +1273,16 @@
 
   function getProcessDataByKey(key) {
     if (!key) return [];
-    return laps.filter(l => (l.process + "||" + l.mode) === key && l.total && l.total > 0)
-               .map(l => l.total);
+    return laps
+      .filter(l => (l.process + "||" + l.mode) === key && l.total && l.total > 0)
+      .map(l => l.total);
+  }
+
+  function colorClassForCp(val) {
+    if (val == null) return "";
+    if (val >= 1.33) return "tag-good";
+    if (val >= 1.0) return "tag-warn";
+    return "tag-bad";
   }
 
   function updateStatsPanel() {
@@ -1288,25 +1312,25 @@
     const USL = medVal * 1.1;
     const cp = (USL - LSL) / (6 * (std || 0.0001));
     const cpk = Math.min(
-      (USL - meanVal)/(3*std || 0.0001),
-      (meanVal-LSL)/(3*std || 0.0001)
+      (USL - meanVal)/(3*(std || 0.0001)),
+      (meanVal-LSL)/(3*(std || 0.0001))
     );
 
-    let verdict;
-    if (cp >= 1.33 && cpk >= 1.33) {
-      verdict = "Process capable vs internal target.";
-    } else if (cp >= 1.0 && cpk >= 1.0) {
-      verdict = "Borderline capable – keep improving.";
-    } else {
-      verdict = "Process currently not capable – focus here.";
-    }
+    const cpClass = colorClassForCp(cp);
+    const cpkClass = colorClassForCp(cpk);
 
     capabilitySummary.innerHTML =
-      `<span><strong>N:</strong> ${N}</span><br/>
-       <span><strong>Mean / Median:</strong> ${meanVal.toFixed(2)} s / ${medVal.toFixed(2)} s</span><br/>
-       <span><strong>P10 / P25 / P50 / P75 / P90:</strong> ${p10.toFixed(2)} / ${p25.toFixed(2)} / ${p50.toFixed(2)} / ${p75.toFixed(2)} / ${p90.toFixed(2)} s</span><br/>
-       <span><strong>Cp:</strong> ${cp.toFixed(2)} | <strong>Cpk:</strong> ${cpk.toFixed(2)}</span><br/>
-       <span>${verdict}</span>`;
+      `<table class="mini-cap-table">
+         <tr><th>Metric</th><th>Value</th></tr>
+         <tr><td>N</td><td>${N}</td></tr>
+         <tr><td>Mean (s)</td><td>${meanVal.toFixed(2)}</td></tr>
+         <tr><td>Median (s)</td><td>${medVal.toFixed(2)}</td></tr>
+         <tr><td>σ (s)</td><td>${std.toFixed(2)}</td></tr>
+         <tr><td>Percentiles (P10 / 25 / 50 / 75 / 90)</td>
+             <td>${p10.toFixed(2)} / ${p25.toFixed(2)} / ${p50.toFixed(2)} / ${p75.toFixed(2)} / ${p90.toFixed(2)}</td></tr>
+         <tr><td>Cp</td><td class="${cpClass}">${cp.toFixed(2)}</td></tr>
+         <tr><td>Cpk</td><td class="${cpkClass}">${cpk.toFixed(2)}</td></tr>
+       </table>`;
   }
 
   graphProcessSelect.addEventListener("change", () => {
@@ -1327,7 +1351,7 @@
 
     if (!data.length) return;
 
-    // histogram
+    // Histogram
     const ctxH = histCanvas.getContext("2d");
     const w = histCanvas.width;
     const h = histCanvas.height;
@@ -1378,24 +1402,78 @@
       ctxX.fill();
     });
 
-    // capability "bell" (normalizada)
+    // Capability / efficiency bar chart (Cp, Cpk + Eff + Cap info)
     const ctxC = capCanvas.getContext("2d");
     const w3 = capCanvas.width;
     const h3 = capCanvas.height;
     ctxC.fillStyle = "#050c1a";
     ctxC.fillRect(0,0,w3,h3);
 
-    ctxC.strokeStyle = "#4ade80";
-    ctxC.beginPath();
-    ctxC.moveTo(20,h3-20);
-    for (let i=0; i<100; i++) {
-      const x = 20 + (i/99)*(w3-40);
-      const z = -3 + 6*(i/99);
-      const yNorm = Math.exp(-0.5*Math.pow(z,2));
-      const y = h3-20 - yNorm*(h3-30);
-      ctxC.lineTo(x,y);
+    const medVal = median(data);
+    const std = stdDev(data) || 0.0001;
+    const LSL = 0;
+    const USL = medVal * 1.1;
+    const cp = (USL - LSL) / (6 * (std || 0.0001));
+    const cpk = Math.min(
+      (USL - meanVal)/(3*(std || 0.0001)),
+      (meanVal-LSL)/(3*(std || 0.0001))
+    );
+
+    const eff = parseFloat(efficiencyInput.value) || 100;
+    const effFactor = eff / 100;
+    const cap100 = medVal ? 3600 / medVal : null;
+    const capEff = cap100 != null ? cap100 * effFactor : null;
+
+    // Texto principal
+    ctxC.fillStyle = "#c3c8e4";
+    ctxC.font = "10px system-ui";
+    ctxC.fillText(`Eff: ${eff.toFixed(0)}%`, 10, 14);
+    if (medVal) {
+      ctxC.fillText(`CTmed: ${medVal.toFixed(2)} s`, 10, 28);
     }
+    if (cap100 != null && capEff != null) {
+      ctxC.fillText(`Cap 100%: ${cap100.toFixed(1)} pph`, 10, 42);
+      ctxC.fillText(`Cap @Eff: ${capEff.toFixed(1)} pph`, 10, 56);
+    }
+
+    // Barras Cp / Cpk
+    const maxScale = 2.5;
+    const baseY = h3 - 20;
+    const barAreaWidth = w3 - 80;
+    const barWidth = barAreaWidth / 3;
+
+    function barColor(v) {
+      if (v >= 1.33) return "#18c37a";
+      if (v >= 1.0) return "#ffd166";
+      return "#ff3b30";
+    }
+
+    ctxC.strokeStyle = "#273453";
+    ctxC.beginPath();
+    ctxC.moveTo(60, baseY);
+    ctxC.lineTo(w3-10, baseY);
     ctxC.stroke();
+
+    const cpHeight = Math.min(cp, maxScale) / maxScale * (h3 - 80);
+    const cpkHeight = Math.min(cpk, maxScale) / maxScale * (h3 - 80);
+
+    // Cp bar
+    ctxC.fillStyle = barColor(cp);
+    ctxC.fillRect(70, baseY - cpHeight, barWidth, cpHeight);
+    ctxC.fillStyle = "#c3c8e4";
+    ctxC.fillText("Cp", 70, baseY + 10);
+    if (!isNaN(cp)) {
+      ctxC.fillText(cp.toFixed(2), 70, baseY - cpHeight - 4);
+    }
+
+    // Cpk bar
+    ctxC.fillStyle = barColor(cpk);
+    ctxC.fillRect(70 + barWidth + 10, baseY - cpkHeight, barWidth, cpkHeight);
+    ctxC.fillStyle = "#c3c8e4";
+    ctxC.fillText("Cpk", 70 + barWidth + 10, baseY + 10);
+    if (!isNaN(cpk)) {
+      ctxC.fillText(cpk.toFixed(2), 70 + barWidth + 10, baseY - cpkHeight - 4);
+    }
   }
 
   function updateComplianceSummary() {
