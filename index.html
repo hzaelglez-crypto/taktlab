@@ -124,6 +124,35 @@
     padding:4px 4px 10px;
   }
 
+  /* NEW: bloque de info de muestra bajo el cronómetro */
+  .sample-info{
+    font-size:.78rem;
+    margin:0 0 6px;
+    padding:4px 8px;
+    border-radius:10px;
+    border:1px solid transparent;
+  }
+  .sample-neutral{
+    background:rgba(255,255,255,.03);
+    border-color:rgba(255,255,255,.08);
+    color:var(--text-soft);
+  }
+  .sample-good{
+    background:rgba(0,200,83,.15);
+    border-color:rgba(0,200,83,.7);
+    color:#c8e6c9;
+  }
+  .sample-warn{
+    background:rgba(255,193,7,.14);
+    border-color:rgba(255,193,7,.8);
+    color:#ffe082;
+  }
+  .sample-bad{
+    background:rgba(244,67,54,.16);
+    border-color:rgba(244,67,54,.9);
+    color:#ffab91;
+  }
+
   .btn-row-main{
     display:flex;
     gap:10px;
@@ -376,6 +405,10 @@
 
     <div class="timer-card" id="timerCard">
       <div class="timer-display" id="display">00:00.00</div>
+      <!-- NEW: info de tamaño de muestra / error -->
+      <div class="sample-info sample-neutral" id="sampleInfo">
+        No samples yet for current process. Start capturing laps.
+      </div>
       <div class="btn-row-main">
         <button class="btn btn-start" id="btnStart">Start</button>
         <button class="btn btn-lap" id="btnLap">LAP</button>
@@ -574,6 +607,7 @@
   const btnLap = document.getElementById('btnLap');
   const timerCard = document.getElementById('timerCard');
   const logoGear = document.getElementById('logoGear');
+  const sampleInfoDiv = document.getElementById('sampleInfo'); // NEW
 
   const processInput = document.getElementById('processName');
   const modeSelect   = document.getElementById('mode');
@@ -661,12 +695,9 @@
     const secs = Math.max(elapsed/1000,0);
 
     if(running && mode === 'MLD'){
-      // T1 y T2 como segmentos independientes
       if (pendingT1 === null) {
-        // midiendo T1
         t1Indicator.textContent = formatSecs(secs) + ' s';
       } else {
-        // midiendo T2 (ya reiniciamos elapsed al terminar T1)
         const t2 = secs;
         t2Indicator.textContent = formatSecs(t2) + ' s';
       }
@@ -857,6 +888,72 @@
     if(pcd<=0) return null;
     const secondsPerDay = hours*3600;
     return secondsPerDay/pcd;
+  }
+
+  /* NEW: cálculo de tamaño de muestra / error para el proceso activo */
+  function updateSampleInfo(){
+    if(!sampleInfoDiv) return;
+
+    const groups = groupByProcess();
+    const {proc,mode} = ensureDefaults();
+    const key = proc+'||'+mode;
+    const arr = groups.get(key) || [];
+
+    // Sin datos
+    if(!arr.length){
+      sampleInfoDiv.className = 'sample-info sample-neutral';
+      sampleInfoDiv.textContent = 'No samples yet for current process. Start capturing laps.';
+      return;
+    }
+
+    const st = calcStats(arr);
+    if(!st || st.n < 3){
+      sampleInfoDiv.className = 'sample-info sample-neutral';
+      sampleInfoDiv.textContent = `Samples: ${st ? st.n : 0} – need ≥3 laps before estimating error.`;
+      return;
+    }
+
+    const n = st.n;
+    const cv = st.cv || 0;
+
+    // Configuración: escenario crítico → error objetivo 3% @95%
+    const Z = 1.96;
+    const targetError = 0.03; // 3%
+
+    let recN;
+    let eActualRel;
+
+    if(cv === 0){
+      // Todos los tiempos iguales: variación cero (en la práctica, error ~0)
+      recN = Math.max(10,n);
+      eActualRel = 0;
+    }else{
+      recN = Math.ceil(Math.pow((Z * cv) / targetError, 2));
+      if(recN < 10) recN = 10; // mínimo operativo
+      eActualRel = (Z * cv) / Math.sqrt(n);
+    }
+
+    const eActualPct = eActualRel * 100;
+    const ratio = n / recN;
+
+    let cls = 'sample-warn';
+    let msgExtra = '';
+
+    if(ratio < 0.6){
+      cls = 'sample-bad';
+      msgExtra = 'Sample too small for ±3% – use only as reference.';
+    }else if(ratio < 0.9){
+      cls = 'sample-warn';
+      msgExtra = 'Almost there for ±3% – take a few more laps.';
+    }else{
+      cls = 'sample-good';
+      msgExtra = 'Sample size is enough for ±3% (critical scenario).';
+    }
+
+    const eText = isFinite(eActualPct) ? eActualPct.toFixed(1) : '—';
+    sampleInfoDiv.className = 'sample-info ' + cls;
+    sampleInfoDiv.textContent =
+      `Samples: ${n} / ${recN} · Est. error: ±${eText}% (95%) – ` + msgExtra;
   }
 
   function renderDataTable(){
@@ -1108,7 +1205,7 @@
       const mean = st.mean;
       const med = st.median;
 
-      // tamaño de muestra recomendado según variación
+      // tamaño de muestra recomendado según variación (regla simple)
       let recN;
       if(cv<=0.10) recN = 10;
       else if(cv<=0.20) recN = 15;
@@ -1468,7 +1565,6 @@
     copyToClipboard(header.join('\t')+'\n'+rows.join('\n'));
   });
 
-  // ==== Summary completo (overview + stats + contract + focus) ====
   function buildFullSummaryText(){
     const groups = groupByProcess();
     if(!groups.size) return '';
@@ -1636,6 +1732,7 @@
     renderContractSummary();
     renderStatsFocus();
     updateChartOptions();
+    updateSampleInfo(); // NEW: actualizar bloque bajo cronómetro
   }
 
   chartSelect.addEventListener('change',renderCharts);
