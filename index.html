@@ -685,6 +685,31 @@
         </div>
       </details>
 
+      <!-- NUEVO BLOQUE: educación rápida Cp/Cpk -->
+      <details class="method-details">
+        <summary>Cp &amp; Cpk – quick interpretation</summary>
+        <div class="method-body">
+          <p>
+            TaktLab uses your <strong>contract capacity</strong> (pcs/day) and planned hours/day to build a <strong>cycle-time target</strong>.
+            That target is treated as an <strong>upper spec limit (USL)</strong> for capability:
+          </p>
+          <ul>
+            <li><strong>Cp</strong> = (USL − LSL) / (6·σ). Here LSL is 0 s and USL is the CT target. Cp tells you the <strong>potential</strong> capability if the process were perfectly centered.</li>
+            <li><strong>Cpk</strong> = min(Cpu, Cpl) = min[(USL − μ)/(3·σ), (μ − LSL)/(3·σ)]. It reflects the <strong>real</strong> capability with your current mean and spread.</li>
+          </ul>
+          <p>Fast rules of thumb for decision-making:</p>
+          <ul>
+            <li><strong>Cpk &lt; 1.00</strong> → <strong>Not capable</strong> vs target. Expect chronic backlog or need for overtime. This is where you should attack first.</li>
+            <li><strong>1.00 ≤ Cpk &lt; 1.33</strong> → <strong>Borderline</strong>. You can run, but you have little protection against mix changes, breakdowns or demand spikes.</li>
+            <li><strong>Cpk ≥ 1.33</strong> → <strong>Capable</strong> vs target. Improvements here are “nice to have” unless this is the bottleneck.</li>
+          </ul>
+          <p>
+            Remember: these Cp/Cpk values are valid <strong>only if</strong> the data represent a reasonably stable process and the time-study method is consistent
+            (same product family, same operator group, same conditions).
+          </p>
+        </div>
+      </details>
+
       <details class="method-details">
         <summary>Important notice / disclaimer</summary>
         <div class="method-body">
@@ -702,6 +727,9 @@
             maintenance, product mix or demand can modify the real output. Use the results as a structured reference to support
             engineering and management discussions, always combined with your local standards and technical judgement.
           </p>
+          <p>
+            For support, feedback or custom studies: <strong>hzaelglez@gmail.com</strong>.
+          </p>
         </div>
       </details>
     </div>
@@ -709,7 +737,7 @@
   </div>
 
   <div class="footer-note">
-    Created by Roberto González
+    Created by Roberto González – Contact: hzaelglez@gmail.com
   </div>
 </div>
 <script>
