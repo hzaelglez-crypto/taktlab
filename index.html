@@ -108,6 +108,30 @@
     color:var(--text-soft);
   }
 
+  /* == Language switch == */
+  .lang-switch{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .lang-btn{
+    border-radius:999px;
+    border:1px solid var(--border-soft);
+    background:rgba(2,11,26,.6);
+    color:var(--text-soft);
+    font-size:.7rem;
+    padding:4px 8px;
+    cursor:pointer;
+    min-width:34px;
+  }
+  .lang-btn.active{
+    background:var(--accent-blue);
+    color:#fff;
+    border-color:var(--accent-blue);
+    font-weight:600;
+  }
+
   .timer-card{
     background:var(--bg-card);
     border-radius:18px;
@@ -456,7 +480,11 @@
       </div>
       <div class="title-block">
         <div class="title-main">TaktLab</div>
-        <div class="title-sub">Cycle Time &amp; Capacity Analyzer</div>
+        <div class="title-sub" data-i18n="title.subtitle">Cycle Time &amp; Capacity Analyzer</div>
+      </div>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="es">ES</button>
       </div>
     </div>
 
@@ -467,8 +495,8 @@
         No samples yet for current process. Start capturing laps.
       </div>
       <div class="btn-row-main">
-        <button class="btn btn-start" id="btnStart">Start</button>
-        <button class="btn btn-lap" id="btnLap">LAP</button>
+        <button class="btn btn-start" id="btnStart" data-i18n="btn.start">Start</button>
+        <button class="btn btn-lap" id="btnLap" data-i18n="btn.lap">LAP</button>
       </div>
     </div>
   </div>
@@ -478,41 +506,41 @@
 
     <!-- Controles de medición + T1/T2 -->
     <div class="section-card">
-      <div class="section-title">Measurement Setup</div>
+      <div class="section-title" data-i18n="section.measurementSetup">Measurement Setup</div>
       <div class="mode-row">
         <div>
-          <label for="processName">Process</label><br/>
-          <input id="processName" type="text" placeholder="e.g. Op 30-1" />
+          <label for="processName" data-i18n="label.process">Process</label><br/>
+          <input id="processName" type="text" placeholder="e.g. Op 30-1" data-i18n-placeholder="label.processPlaceholder" />
         </div>
         <div>
-          <label for="mode">Mode</label><br/>
+          <label for="mode" data-i18n="label.mode">Mode</label><br/>
           <select id="mode">
-            <option value="CT">Cycle Time (CT)</option>
-            <option value="MLD">Machine &amp; Load/Unload</option>
+            <option value="CT" data-i18n="mode.ct">Cycle Time (CT)</option>
+            <option value="MLD" data-i18n="mode.mld">Machine &amp; Load/Unload</option>
           </select>
         </div>
         <div>
-          <label for="efficiency">Efficiency %</label><br/>
+          <label for="efficiency" data-i18n="label.efficiency">Efficiency %</label><br/>
           <input id="efficiency" type="number" value="100" min="10" max="100" step="1" />
         </div>
         <div>
-          <label for="contractPcd">Contract Cap (pcs/day)</label><br/>
+          <label for="contractPcd" data-i18n="label.contractPcd">Contract Cap (pcs/day)</label><br/>
           <input id="contractPcd" type="number" min="0" step="1" />
         </div>
         <div>
-          <label for="hoursPerDay">Hours / Day</label><br/>
+          <label for="hoursPerDay" data-i18n="label.hoursPerDay">Hours / Day</label><br/>
           <input id="hoursPerDay" type="number" value="8" min="1" max="24" step="0.5" />
         </div>
         <div>
-          <label for="daysPerWeek">Days / Week</label><br/>
+          <label for="daysPerWeek" data-i18n="label.daysPerWeek">Days / Week</label><br/>
           <input id="daysPerWeek" type="number" value="5" min="1" max="7" step="1" />
         </div>
         <div>
-          <label for="capView">Capacity View</label><br/>
+          <label for="capView" data-i18n="label.capView">Capacity View</label><br/>
           <select id="capView">
-            <option value="hour">per Hour</option>
-            <option value="day">per Day</option>
-            <option value="week">per Week</option>
+            <option value="hour" data-i18n="capView.hour">per Hour</option>
+            <option value="day" data-i18n="capView.day">per Day</option>
+            <option value="week" data-i18n="capView.week">per Week</option>
           </select>
         </div>
       </div>
@@ -522,14 +550,14 @@
         <div class="mini-t12">
           <div class="mini-ring paused" id="ringT1"></div>
           <div>
-            <div class="mini-label">T1 – Machine</div>
+            <div class="mini-label" data-i18n="mini.t1Label">T1 – Machine</div>
             <div class="mini-value" id="t1Indicator">0.0 s</div>
           </div>
         </div>
         <div class="mini-t12">
           <div class="mini-ring paused" id="ringT2"></div>
           <div>
-            <div class="mini-label">T2 – Load/Unload</div>
+            <div class="mini-label" data-i18n="mini.t2Label">T2 – Load/Unload</div>
             <div class="mini-value" id="t2Indicator">0.0 s</div>
           </div>
         </div>
@@ -538,13 +566,13 @@
 
     <!-- Process Capacity Overview -->
     <div class="section-card">
-      <div class="section-title">Process Capacity Overview</div>
+      <div class="section-title" data-i18n="section.capacityOverview">Process Capacity Overview</div>
       <table id="overviewTable">
         <thead>
           <tr>
-            <th>Process</th>
-            <th>Mode</th>
-            <th>N</th>
+            <th data-i18n="col.process">Process</th>
+            <th data-i18n="col.mode">Mode</th>
+            <th data-i18n="col.n">N</th>
             <th>CTmed (s)</th>
             <th>Cap 100%</th>
             <th>Cap @Eff</th>
@@ -557,14 +585,14 @@
 
     <!-- Stats detail -->
     <div class="section-card">
-      <div class="section-title">Statistical Detail (per process)</div>
+      <div class="section-title" data-i18n="section.statsDetail">Statistical Detail (per process)</div>
       <div style="max-height:260px;overflow:auto;">
         <table id="statsTable">
           <thead>
             <tr>
-              <th>Process</th>
-              <th>Mode</th>
-              <th>N</th>
+              <th data-i18n="col.process">Process</th>
+              <th data-i18n="col.mode">Mode</th>
+              <th data-i18n="col.n">N</th>
               <th>Mean</th>
               <th>Median</th>
               <th>P10</th>
@@ -584,7 +612,7 @@
 
     <!-- Contract vs Capacity Summary -->
     <div class="section-card">
-      <div class="section-title">Contract vs Capacity Summary</div>
+      <div class="section-title" data-i18n="section.contractSummary">Contract vs Capacity Summary</div>
       <div id="contractSummary" style="font-size:.78rem;"></div>
       <!-- NEW: Capacity Snapshot (actual vs potencial) -->
       <div id="capacitySnapshot" class="capacity-snapshot"></div>
@@ -592,9 +620,9 @@
 
     <!-- Charts tipo mini-Minitab -->
     <div class="section-card">
-      <div class="section-title">Charts (selected process)</div>
+      <div class="section-title" data-i18n="section.charts">Charts (selected process)</div>
       <div style="margin-bottom:6px;font-size:.75rem;">
-        <label for="chartProcessSelect">Process / Mode:</label>
+        <label for="chartProcessSelect" data-i18n="label.chartProcessLabel">Process / Mode:</label>
         <select id="chartProcessSelect"></select>
       </div>
       <div class="charts-wrapper">
@@ -611,41 +639,41 @@
 
     <!-- Stats focus -->
     <div class="section-card">
-      <div class="section-title">Stats Focus</div>
+      <div class="section-title" data-i18n="section.statsFocus">Stats Focus</div>
       <div class="stats-focus" id="statsFocus"></div>
-      <div style="margin-top:6px;font-size:.68rem;color:var(--text-muted);">
+      <div style="margin-top:6px;font-size:.68rem;color:var(--text-muted);" data-i18n="stats.note">
         Simple language on purpose: few / enough samples, low / high variation, close to normal / not normal, capable / not capable.
       </div>
     </div>
 
     <!-- Data controls -->
     <div class="section-card">
-      <div class="section-title">Data Controls</div>
+      <div class="section-title" data-i18n="section.dataControls">Data Controls</div>
       <div class="btn-row-secondary">
-        <button class="btn-small" id="btnCopyAll">Copy All</button>
-        <button class="btn-small" id="btnCopySummary">Copy Summary</button>
-        <button class="btn-small" id="btnAddManualLap">Add Manual Lap</button>
-        <button class="btn-small" id="btnReset">Reset</button>
+        <button class="btn-small" id="btnCopyAll" data-i18n="btn.copyAll">Copy All</button>
+        <button class="btn-small" id="btnCopySummary" data-i18n="btn.copySummary">Copy Summary</button>
+        <button class="btn-small" id="btnAddManualLap" data-i18n="btn.addManualLap">Add Manual Lap</button>
+        <button class="btn-small" id="btnReset" data-i18n="btn.reset">Reset</button>
       </div>
     </div>
 
     <!-- Raw Time Data -->
     <div class="section-card">
-      <div class="section-title">Raw Time Data</div>
+      <div class="section-title" data-i18n="section.rawData">Raw Time Data</div>
       <div style="max-height:320px;overflow:auto;">
         <table id="dataTable">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Process</th>
-              <th>Mode</th>
-              <th>Status</th>
-              <th>Note</th>
-              <th>T1 (s)</th>
-              <th>T2 (s)</th>
-              <th>Total (s)</th>
-              <th>Edit</th>
-              <th>Del</th>
+              <th data-i18n="col.index">#</th>
+              <th data-i18n="col.process">Process</th>
+              <th data-i18n="col.mode">Mode</th>
+              <th data-i18n="col.status">Status</th>
+              <th data-i18n="col.note">Note</th>
+              <th data-i18n="col.t1">T1 (s)</th>
+              <th data-i18n="col.t2">T2 (s)</th>
+              <th data-i18n="col.total">Total (s)</th>
+              <th data-i18n="col.edit">Edit</th>
+              <th data-i18n="col.del">Del</th>
             </tr>
           </thead>
           <tbody id="dataBody"></tbody>
@@ -655,10 +683,10 @@
 
     <!-- Method & Guide (desplegable) -->
     <div class="section-card">
-      <div class="section-title">Method &amp; Guide</div>
+      <div class="section-title" data-i18n="section.methodGuide">Method &amp; Guide</div>
 
       <details class="method-details">
-        <summary>How TaktLab estimates capacity</summary>
+        <summary data-i18n="method.howTitle">How TaktLab estimates capacity</summary>
         <div class="method-body">
           <ul>
             <li><strong>Cycle times:</strong> based on <strong>raw laps</strong> taken at the process (CT or Machine + Load/Unload).</li>
@@ -672,7 +700,7 @@
       </details>
 
       <details class="method-details">
-        <summary>What to enter in each field</summary>
+        <summary data-i18n="method.whatTitle">What to enter in each field</summary>
         <div class="method-body">
           <ul>
             <li><strong>Process:</strong> operation ID or description (e.g. “Op 30-1 Mazak #3”).</li>
@@ -687,7 +715,7 @@
 
       <!-- NUEVO BLOQUE: educación rápida Cp/Cpk -->
       <details class="method-details">
-        <summary>Cp &amp; Cpk – quick interpretation</summary>
+        <summary data-i18n="method.cpTitle">Cp &amp; Cpk – quick interpretation</summary>
         <div class="method-body">
           <p>
             TaktLab uses your <strong>contract capacity</strong> (pcs/day) and planned hours/day to build a <strong>cycle-time target</strong>.
@@ -711,7 +739,7 @@
       </details>
 
       <details class="method-details">
-        <summary>Important notice / disclaimer</summary>
+        <summary data-i18n="method.noticeTitle">Important notice / disclaimer</summary>
         <div class="method-body">
           <p>
             TaktLab is a <strong>decision-support tool</strong> based on time studies and basic statistical analysis (median, percentiles,
@@ -736,7 +764,7 @@
 
   </div>
 
-  <div class="footer-note">
+  <div class="footer-note" data-i18n="footer.note">
     Created by Roberto González – Contact: hzaelglez@gmail.com
   </div>
 </div>
@@ -777,6 +805,185 @@
   const chartSelect      = document.getElementById('chartProcessSelect');
   const timeSeriesCanvas = document.getElementById('timeSeriesCanvas');
   const histCanvas       = document.getElementById('histCanvas');
+
+  const langButtons = document.querySelectorAll('.lang-btn');
+
+  /* ======== i18n simple EN / ES ======== */
+  const i18n = {
+    en:{
+      'title.subtitle':'Cycle Time & Capacity Analyzer',
+
+      'btn.start':'Start',
+      'btn.pause':'Pause',
+      'btn.lap':'LAP',
+      'btn.copyAll':'Copy All',
+      'btn.copySummary':'Copy Summary',
+      'btn.addManualLap':'Add Manual Lap',
+      'btn.reset':'Reset',
+
+      'section.measurementSetup':'Measurement Setup',
+      'section.capacityOverview':'Process Capacity Overview',
+      'section.statsDetail':'Statistical Detail (per process)',
+      'section.contractSummary':'Contract vs Capacity Summary',
+      'section.charts':'Charts (selected process)',
+      'section.statsFocus':'Stats Focus',
+      'section.dataControls':'Data Controls',
+      'section.rawData':'Raw Time Data',
+      'section.methodGuide':'Method & Guide',
+
+      'label.process':'Process',
+      'label.processPlaceholder':'e.g. Op 30-1',
+      'label.mode':'Mode',
+      'label.efficiency':'Efficiency %',
+      'label.contractPcd':'Contract Cap (pcs/day)',
+      'label.hoursPerDay':'Hours / Day',
+      'label.daysPerWeek':'Days / Week',
+      'label.capView':'Capacity View',
+      'label.chartProcessLabel':'Process / Mode:',
+
+      'mode.ct':'Cycle Time (CT)',
+      'mode.mld':'Machine & Load/Unload',
+
+      'capView.hour':'per Hour',
+      'capView.day':'per Day',
+      'capView.week':'per Week',
+
+      'mini.t1Label':'T1 – Machine',
+      'mini.t2Label':'T2 – Load/Unload',
+
+      'col.index':'#',
+      'col.process':'Process',
+      'col.mode':'Mode',
+      'col.status':'Status',
+      'col.note':'Note',
+      'col.t1':'T1 (s)',
+      'col.t2':'T2 (s)',
+      'col.total':'Total (s)',
+      'col.edit':'Edit',
+      'col.del':'Del',
+      'col.n':'N',
+
+      'method.howTitle':'How TaktLab estimates capacity',
+      'method.whatTitle':'What to enter in each field',
+      'method.cpTitle':'Cp & Cpk – quick interpretation',
+      'method.noticeTitle':'Important notice / disclaimer',
+
+      'stats.note':'Simple language on purpose: few / enough samples, low / high variation, close to normal / not normal, capable / not capable.',
+
+      'footer.note':'Created by Roberto González – Contact: hzaelglez@gmail.com'
+    },
+    es:{
+      'title.subtitle':'Analizador de Tiempo de Ciclo y Capacidad',
+
+      'btn.start':'Iniciar',
+      'btn.pause':'Pausar',
+      'btn.lap':'VUELTA',
+      'btn.copyAll':'Copiar todo',
+      'btn.copySummary':'Copiar resumen',
+      'btn.addManualLap':'Agregar vuelta manual',
+      'btn.reset':'Reiniciar',
+
+      'section.measurementSetup':'Configuración de Medición',
+      'section.capacityOverview':'Resumen de Capacidad por Proceso',
+      'section.statsDetail':'Detalle Estadístico (por proceso)',
+      'section.contractSummary':'Resumen Contrato vs Capacidad',
+      'section.charts':'Gráficas (proceso seleccionado)',
+      'section.statsFocus':'Enfoque Estadístico',
+      'section.dataControls':'Controles de Datos',
+      'section.rawData':'Datos Crudos de Tiempo',
+      'section.methodGuide':'Método y Guía',
+
+      'label.process':'Proceso',
+      'label.processPlaceholder':'p. ej. Op 30-1',
+      'label.mode':'Modo',
+      'label.efficiency':'Eficiencia %',
+      'label.contractPcd':'Capacidad contrato (pzs/día)',
+      'label.hoursPerDay':'Horas / día',
+      'label.daysPerWeek':'Días / semana',
+      'label.capView':'Vista de capacidad',
+      'label.chartProcessLabel':'Proceso / Modo:',
+
+      'mode.ct':'Tiempo de ciclo (CT)',
+      'mode.mld':'Máquina y Carga/Descarga',
+
+      'capView.hour':'por hora',
+      'capView.day':'por día',
+      'capView.week':'por semana',
+
+      'mini.t1Label':'T1 – Máquina',
+      'mini.t2Label':'T2 – Carga/Descarga',
+
+      'col.index':'#',
+      'col.process':'Proceso',
+      'col.mode':'Modo',
+      'col.status':'Estatus',
+      'col.note':'Nota',
+      'col.t1':'T1 (s)',
+      'col.t2':'T2 (s)',
+      'col.total':'Total (s)',
+      'col.edit':'Editar',
+      'col.del':'Borrar',
+      'col.n':'N',
+
+      'method.howTitle':'Cómo TaktLab estima la capacidad',
+      'method.whatTitle':'Qué capturar en cada campo',
+      'method.cpTitle':'Cp y Cpk – interpretación rápida',
+      'method.noticeTitle':'Aviso importante / descargo de responsabilidad',
+
+      'stats.note':'Lenguaje simple a propósito: pocas / suficientes muestras, baja / alta variación, cercano / no cercano a normal, capaz / no capaz.',
+
+      'footer.note':'Creado por Roberto González – Contacto: hzaelglez@gmail.com'
+    }
+  };
+
+  function t(key){
+    return (i18n[currentLang] && i18n[currentLang][key]) ||
+           (i18n.en[key]) ||
+           key;
+  }
+
+  let currentLang = localStorage.getItem('taktlabLang') || 'en';
+
+  function applyTranslations(){
+    document.querySelectorAll('[data-i18n]').forEach(el=>{
+      const key = el.dataset.i18n;
+      if(!key) return;
+      const txt = t(key);
+      // El botón Start lo ajustamos aparte según corra o no
+      if(el === btnStart) return;
+      el.textContent = txt;
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+      const key = el.dataset.i18nPlaceholder;
+      if(!key) return;
+      const txt = t(key);
+      if(txt) el.placeholder = txt;
+    });
+  }
+
+  function updateLangButtons(){
+    langButtons.forEach(b=>{
+      b.classList.toggle('active', b.dataset.lang === currentLang);
+    });
+  }
+
+  function setLanguage(lang){
+    currentLang = (lang === 'es') ? 'es' : 'en';
+    localStorage.setItem('taktlabLang', currentLang);
+    document.documentElement.lang = currentLang;
+    updateLangButtons();
+    applyTranslations();
+    // Ajustar texto del botón Start/Pause según estado
+    if(running){
+      btnStart.textContent = t('btn.pause');
+    }else{
+      btnStart.textContent = t('btn.start');
+    }
+  }
+
+  langButtons.forEach(btn=>{
+    btn.addEventListener('click',()=> setLanguage(btn.dataset.lang));
+  });
 
   let running = false;
   let startTime = 0;
@@ -854,7 +1061,7 @@
     running = true;
     startTime = performance.now() - elapsed;
     timerId = requestAnimationFrame(tick);
-    btnStart.textContent = 'Pause';
+    btnStart.textContent = t('btn.pause');
     refreshRingStates();
   }
 
@@ -863,7 +1070,7 @@
     running = false;
     cancelAnimationFrame(timerId);
     timerId = null;
-    btnStart.textContent = 'Start';
+    btnStart.textContent = t('btn.start');
     refreshRingStates();
   }
 
@@ -2001,6 +2208,7 @@
   updateDisplay();
   refreshRingStates();
   renderAll();
+  setLanguage(currentLang); // aplicar EN/ES al inicio
 })();
 </script>
 </body>
