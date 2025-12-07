@@ -382,6 +382,61 @@
     border-radius:10px;
   }
 
+  /* Capacity Snapshot */
+  .capacity-snapshot{
+    margin-top:6px;
+    font-size:.76rem;
+    line-height:1.3;
+    border-top:1px solid rgba(255,255,255,.06);
+    padding-top:6px;
+  }
+  .snapshot-line{
+    margin-bottom:2px;
+  }
+  .capacity-gain{
+    color:var(--accent-green);
+    font-weight:700;
+    margin-left:4px;
+  }
+
+  /* Method & Guide */
+  .method-details{
+    font-size:.75rem;
+    margin-bottom:6px;
+    background:var(--bg-card-soft);
+    border-radius:10px;
+    border:1px solid var(--border-soft);
+    padding:4px 6px;
+  }
+  .method-details summary{
+    cursor:pointer;
+    font-weight:600;
+    list-style:none;
+  }
+  .method-details summary::-webkit-details-marker{
+    display:none;
+  }
+  .method-details summary::before{
+    content:"+";
+    margin-right:6px;
+    color:var(--accent-blue);
+    font-weight:700;
+  }
+  .method-details[open] summary::before{
+    content:"–";
+  }
+  .method-body{
+    margin-top:4px;
+    color:var(--text-soft);
+  }
+  .method-body ul{
+    padding-left:16px;
+    margin:4px 0;
+  }
+  .method-body li{
+    margin-bottom:2px;
+  }
+
   @media (max-width:600px){
     .timer-display{font-size:2.2rem;}
     .btn-row-main{gap:6px;}
@@ -531,6 +586,8 @@
     <div class="section-card">
       <div class="section-title">Contract vs Capacity Summary</div>
       <div id="contractSummary" style="font-size:.78rem;"></div>
+      <!-- NEW: Capacity Snapshot (actual vs potencial) -->
+      <div id="capacitySnapshot" class="capacity-snapshot"></div>
     </div>
 
     <!-- Charts tipo mini-Minitab -->
@@ -596,6 +653,59 @@
       </div>
     </div>
 
+    <!-- Method & Guide (desplegable) -->
+    <div class="section-card">
+      <div class="section-title">Method &amp; Guide</div>
+
+      <details class="method-details">
+        <summary>How TaktLab estimates capacity</summary>
+        <div class="method-body">
+          <ul>
+            <li><strong>Cycle times:</strong> based on <strong>raw laps</strong> taken at the process (CT or Machine + Load/Unload).</li>
+            <li><strong>CTmed (s):</strong> capacity is calculated using the <strong>median</strong> of the total time (T1+T2 when applicable).</li>
+            <li><strong>Capacity 100%:</strong> 3600 / CTmed → units/hour, then scaled to day/week with the hours &amp; days you set.</li>
+            <li><strong>Capacity @Eff:</strong> applies the Efficiency % (OEE or planned effectiveness) to the theoretical 100% capacity.</li>
+            <li><strong>Contract vs capacity:</strong> compares Capacity @Eff vs Contract Cap, using the selected capacity view (hour/day/week).</li>
+            <li><strong>Potential capacity:</strong> uses the <strong>P10 (best 10%)</strong> of the distribution as the target if the process is stabilized.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="method-details">
+        <summary>What to enter in each field</summary>
+        <div class="method-body">
+          <ul>
+            <li><strong>Process:</strong> operation ID or description (e.g. “Op 30-1 Mazak #3”).</li>
+            <li><strong>Mode:</strong> CT when you only care about total cycle; Machine &amp; Load/Unload when you want T1 vs T2 split.</li>
+            <li><strong>Efficiency %:</strong> expected OEE / planned effectiveness (e.g. 85%).</li>
+            <li><strong>Contract Cap (pcs/day):</strong> daily volume committed to customer for that process/part number.</li>
+            <li><strong>Hours / Day &amp; Days / Week:</strong> planned schedule actually available for that process (net calendar).</li>
+            <li><strong>Capacity View:</strong> choose whether you want capacity per hour, per day or per week in the tables and snapshot.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="method-details">
+        <summary>Important notice / disclaimer</summary>
+        <div class="method-body">
+          <p>
+            TaktLab is a <strong>decision-support tool</strong> based on time studies and basic statistical analysis (median, percentiles,
+            standard deviation). Results depend on:
+          </p>
+          <ul>
+            <li>The quality of the time measurements (method, operator, conditions).</li>
+            <li>The number of samples taken and the stability of the process during the study.</li>
+            <li>The assumptions entered by the user (Efficiency %, hours/day, days/week, contract volume).</li>
+          </ul>
+          <p>
+            The “capacity” and “potential” values are <strong>estimates</strong>, not guarantees. Any change in staffing, methods,
+            maintenance, product mix or demand can modify the real output. Use the results as a structured reference to support
+            engineering and management discussions, always combined with your local standards and technical judgement.
+          </p>
+        </div>
+      </details>
+    </div>
+
   </div>
 
   <div class="footer-note">
@@ -628,6 +738,7 @@
   const statsBody      = document.getElementById('statsBody');
   const contractSummary= document.getElementById('contractSummary');
   const statsFocusDiv  = document.getElementById('statsFocus');
+  const capacitySnapshotDiv = document.getElementById('capacitySnapshot');
 
   const dataBody    = document.getElementById('dataBody');
   const btnCopyAll  = document.getElementById('btnCopyAll');
@@ -1190,6 +1301,76 @@
     contractSummary.appendChild(frag);
   }
 
+  // NEW: Capacity Snapshot (líneas 1 y 2 debajo del resumen)
+  function renderCapacitySnapshot(){
+    if(!capacitySnapshotDiv) return;
+
+    const groups = groupByProcess();
+    const {proc,mode} = ensureDefaults();
+    const key = proc + '||' + mode;
+    const arr = groups.get(key);
+
+    capacitySnapshotDiv.innerHTML = '';
+
+    if(!arr || !arr.length){
+      capacitySnapshotDiv.innerHTML =
+        '<span style="color:var(--text-muted);">No capacity snapshot yet for current process. Take a few laps first.</span>';
+      return;
+    }
+
+    const st = calcStats(arr);
+    if(!st || !st.median){
+      capacitySnapshotDiv.innerHTML =
+        '<span style="color:var(--text-muted);">Not enough data to estimate capacity snapshot.</span>';
+      return;
+    }
+
+    const eff   = Math.min(Math.max(parseFloat(effInput.value)||100,10),100);
+    const hours = Math.min(Math.max(parseFloat(hInput.value)||8,1),24);
+    const days  = Math.min(Math.max(parseInt(dInput.value)||5,1),7);
+    const view  = capViewSel.value;
+
+    // Actual (mediana)
+    const ctMed = st.median;
+    let perHourCurr = 3600/ctMed;
+    let capCurr = 0;
+    if(view === 'hour') capCurr = perHourCurr;
+    else if(view === 'day') capCurr = perHourCurr*hours;
+    else capCurr = perHourCurr*hours*days;
+    const capCurrEff = capCurr*(eff/100);
+
+    // Potencial usando P10 (mejor 10% de tiempos)
+    const ctPot = st.p10 && st.p10 > 0 ? st.p10 : ctMed;
+    let perHourPot = 3600/ctPot;
+    let capPot = 0;
+    if(view === 'hour') capPot = perHourPot;
+    else if(view === 'day') capPot = perHourPot*hours;
+    else capPot = perHourPot*hours*days;
+    const capPotEff = capPot*(eff/100);
+
+    const gain = capPotEff - capCurrEff;
+    const gainPct = capCurrEff > 0 ? (gain/capCurrEff*100) : 0;
+
+    const effLabel = eff.toFixed(0) + '%';
+
+    let gainHtml = '';
+    if(gain > 0){
+      gainHtml = `<span class="capacity-gain">(+${gain.toFixed(1)}; +${gainPct.toFixed(0)}%)</span>`;
+    }else if(gain < 0){
+      gainHtml = ` <span style="color:${'var(--accent-amber)'};">(no gain vs current – P10 ≥ median)</span>`;
+    }
+
+    capacitySnapshotDiv.innerHTML = `
+      <div class="snapshot-line">
+        1) Current capacity @Eff (${effLabel}) ≈ <strong>${capCurrEff ? capCurrEff.toFixed(1) : '-'}</strong> units/${view}
+      </div>
+      <div class="snapshot-line">
+        2) Potential (P10, same Eff) ≈ <strong>${capPotEff ? capPotEff.toFixed(1) : '-'}</strong> units/${view}
+        ${gainHtml}
+      </div>
+    `;
+  }
+
   function renderStatsFocus(){
     statsFocusDiv.innerHTML='';
     const groups = groupByProcess();
@@ -1584,6 +1765,47 @@
     lines.push('TAKTLAB SUMMARY');
     lines.push('');
 
+    // Capacity snapshot for current process (mismo texto que arriba pero plano)
+    const {proc: curProc, mode: curMode} = ensureDefaults();
+    const keySnap = curProc + '||' + curMode;
+    const snapGroups = groupByProcess();
+    const arrSnap = snapGroups.get(keySnap);
+    if(arrSnap && arrSnap.length){
+      const stSnap = calcStats(arrSnap);
+      if(stSnap && stSnap.median){
+        const ctMedS = stSnap.median;
+        let perHourCurr = 3600/ctMedS;
+        let capCurr = 0;
+        if(view === 'hour') capCurr = perHourCurr;
+        else if(view === 'day') capCurr = perHourCurr*hours;
+        else capCurr = perHourCurr*hours*days;
+        const capCurrEff = capCurr*(eff/100);
+
+        const ctPotS = stSnap.p10 && stSnap.p10>0 ? stSnap.p10 : ctMedS;
+        let perHourPot = 3600/ctPotS;
+        let capPot = 0;
+        if(view === 'hour') capPot = perHourPot;
+        else if(view === 'day') capPot = perHourPot*hours;
+        else capPot = perHourPot*hours*days;
+        const capPotEff = capPot*(eff/100);
+
+        const gain = capPotEff - capCurrEff;
+        const gainPct = capCurrEff>0 ? (gain/capCurrEff*100) : 0;
+
+        lines.push(`CAPACITY SNAPSHOT – ${curProc} (${curMode})`);
+        lines.push(
+          `1) Current capacity @Eff (${eff.toFixed(0)}%) ≈ ${capCurrEff ? capCurrEff.toFixed(1) : '-'} units/${view}`
+        );
+        if(capPotEff){
+          lines.push(
+            `2) Potential (P10, same Eff) ≈ ${capPotEff.toFixed(1)} units/${view}` +
+            (gain>0 ? `  [gain ≈ +${gain.toFixed(1)}; +${gainPct.toFixed(0)}%]` : '')
+          );
+        }
+        lines.push('');
+      }
+    }
+
     // Overview
     lines.push('PROCESS CAPACITY OVERVIEW');
     lines.push('Process\tMode\tN\tCTmed(s)\tCap100\tCap@Eff\t% vs contract');
@@ -1734,6 +1956,7 @@
     renderOverview();
     renderStatsDetail();
     renderContractSummary();
+    renderCapacitySnapshot();  // NEW: snapshot actual vs potencial
     renderStatsFocus();
     updateChartOptions();
     updateSampleInfo(); // NEW: actualizar bloque bajo cronómetro
