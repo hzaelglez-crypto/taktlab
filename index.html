@@ -564,6 +564,23 @@
       </div>
     </div>
 
+    <!-- Stats focus (sube justo debajo de Configuración) -->
+    <div class="section-card">
+      <div class="section-title" data-i18n="section.statsFocus">Stats Focus</div>
+      <div class="stats-focus" id="statsFocus"></div>
+      <div style="margin-top:6px;font-size:.68rem;color:var(--text-muted);" data-i18n="stats.note">
+        Simple language on purpose: few / enough samples, low / high variation, close to normal / not normal, capable / not capable.
+      </div>
+    </div>
+
+    <!-- Contract vs Capacity Summary (debajo de Enfoque Estadístico) -->
+    <div class="section-card">
+      <div class="section-title" data-i18n="section.contractSummary">Contract vs Capacity Summary</div>
+      <div id="contractSummary" style="font-size:.78rem;"></div>
+      <!-- NEW: Capacity Snapshot (actual vs potencial) -->
+      <div id="capacitySnapshot" class="capacity-snapshot"></div>
+    </div>
+
     <!-- Process Capacity Overview -->
     <div class="section-card">
       <div class="section-title" data-i18n="section.capacityOverview">Process Capacity Overview</div>
@@ -610,14 +627,6 @@
       </div>
     </div>
 
-    <!-- Contract vs Capacity Summary -->
-    <div class="section-card">
-      <div class="section-title" data-i18n="section.contractSummary">Contract vs Capacity Summary</div>
-      <div id="contractSummary" style="font-size:.78rem;"></div>
-      <!-- NEW: Capacity Snapshot (actual vs potencial) -->
-      <div id="capacitySnapshot" class="capacity-snapshot"></div>
-    </div>
-
     <!-- Charts tipo mini-Minitab -->
     <div class="section-card">
       <div class="section-title" data-i18n="section.charts">Charts (selected process)</div>
@@ -638,15 +647,6 @@
           </div>
           <canvas id="histCanvas"></canvas>
         </div>
-      </div>
-    </div>
-
-    <!-- Stats focus -->
-    <div class="section-card">
-      <div class="section-title" data-i18n="section.statsFocus">Stats Focus</div>
-      <div class="stats-focus" id="statsFocus"></div>
-      <div style="margin-top:6px;font-size:.68rem;color:var(--text-muted);" data-i18n="stats.note">
-        Simple language on purpose: few / enough samples, low / high variation, close to normal / not normal, capable / not capable.
       </div>
     </div>
 
@@ -1017,6 +1017,12 @@
   function formatSecs(s){
     if(!isFinite(s)) return '-';
     return (Math.round(s*10)/10).toFixed(1);
+  }
+  // NUEVO: formateo para piezas / capacidad (enteros + coma de miles)
+  function formatUnits(n){
+    if(!isFinite(n)) return '-';
+    const rounded = Math.round(n);
+    return rounded.toLocaleString('en-US',{maximumFractionDigits:0});
   }
 
   function updateDisplay(){
@@ -1463,8 +1469,8 @@
         <td>${mode}</td>
         <td>${st.n}</td>
         <td>${formatSecs(ctMed)}</td>
-        <td>${cap100?cap100.toFixed(1):'-'}</td>
-        <td>${capEff?capEff.toFixed(1):'-'}</td>
+        <td>${cap100?formatUnits(cap100):'-'}</td>
+        <td>${capEff?formatUnits(capEff):'-'}</td>
         <td>${contractUnits>0?`<span class="badge ${badgeClass}">${badgeText}</span>`:'-'}</td>
       `;
       overviewBody.appendChild(tr);
@@ -1578,7 +1584,7 @@
         – ${currentLang==='es' ? 'mediana de TC' : 'median CT'}
         <span style="font-weight:600;">${formatSecs(ctMed)} s</span>,
         ${currentLang==='es' ? 'capacidad @Eff' : 'capacity @Eff'} ≈
-        <span style="font-weight:600;">${capEff?capEff.toFixed(1):'-'} ${unitsLabel}/${view}</span>
+        <span style="font-weight:600;">${capEff?formatUnits(capEff):'-'} ${unitsLabel}/${view}</span>
         ${contractUnits>0?`<span class="badge ${tagClass}" style="margin-left:4px;">${label}</span>`:''}
       `;
       frag.appendChild(div);
@@ -1646,8 +1652,8 @@
     let gainHtml = '';
     if(gain > 0){
       const txt = currentLang==='es'
-        ? `(+${gain.toFixed(1)}; +${gainPct.toFixed(0)}%)`
-        : `(+${gain.toFixed(1)}; +${gainPct.toFixed(0)}%)`;
+        ? `(+${formatUnits(gain)}; +${gainPct.toFixed(0)}%)`
+        : `(+${formatUnits(gain)}; +${gainPct.toFixed(0)}%)`;
       gainHtml = `<span class="capacity-gain">${txt}</span>`;
     }else if(gain < 0){
       const txt = currentLang==='es'
@@ -1661,14 +1667,14 @@
     capacitySnapshotDiv.innerHTML = `
       <div class="snapshot-line">
         ${currentLang==='es'
-          ? `1) Capacidad actual @Eff (${effLabel}) ≈ <strong>${capCurrEff ? capCurrEff.toFixed(1) : '-'}</strong> ${unitsLabel}/${view}`
-          : `1) Current capacity @Eff (${effLabel}) ≈ <strong>${capCurrEff ? capCurrEff.toFixed(1) : '-'}</strong> ${unitsLabel}/${view}`
+          ? `1) Capacidad actual @Eff (${effLabel}) ≈ <strong>${capCurrEff ? formatUnits(capCurrEff) : '-'}</strong> ${unitsLabel}/${view}`
+          : `1) Current capacity @Eff (${effLabel}) ≈ <strong>${capCurrEff ? formatUnits(capCurrEff) : '-'}</strong> ${unitsLabel}/${view}`
         }
       </div>
       <div class="snapshot-line">
         ${currentLang==='es'
-          ? `2) Potencial (P10, misma Eff) ≈ <strong>${capPotEff ? capPotEff.toFixed(1) : '-'}</strong> ${unitsLabel}/${view}`
-          : `2) Potential (P10, same Eff) ≈ <strong>${capPotEff ? capPotEff.toFixed(1) : '-'}</strong> ${unitsLabel}/${view}`
+          ? `2) Potencial (P10, misma Eff) ≈ <strong>${capPotEff ? formatUnits(capPotEff) : '-'}</strong> ${unitsLabel}/${view}`
+          : `2) Potential (P10, same Eff) ≈ <strong>${capPotEff ? formatUnits(capPotEff) : '-'}</strong> ${unitsLabel}/${view}`
         }
         ${gainHtml}
       </div>
@@ -2166,12 +2172,12 @@
 
         lines.push(`CAPACITY SNAPSHOT – ${curProc} (${curMode})`);
         lines.push(
-          `1) Current capacity @Eff (${eff.toFixed(0)}%) ≈ ${capCurrEff ? capCurrEff.toFixed(1) : '-'} units/${view}`
+          `1) Current capacity @Eff (${eff.toFixed(0)}%) ≈ ${capCurrEff ? formatUnits(capCurrEff) : '-'} units/${view}`
         );
         if(capPotEff){
           lines.push(
-            `2) Potential (P10, same Eff) ≈ ${capPotEff.toFixed(1)} units/${view}` +
-            (gain>0 ? `  [gain ≈ +${gain.toFixed(1)}; +${gainPct.toFixed(0)}%]` : '')
+            `2) Potential (P10, same Eff) ≈ ${formatUnits(capPotEff)} units/${view}` +
+            (gain>0 ? `  [gain ≈ +${formatUnits(gain)}; +${gainPct.toFixed(0)}%]` : '')
           );
         }
         lines.push('');
@@ -2202,7 +2208,7 @@
       }
       let pctVs = contractUnits>0 ? (capEff/contractUnits*100) : NaN;
       lines.push(
-        `${proc}\t${mode}\t${st.n}\t${formatSecs(ctMed)}\t${cap100?cap100.toFixed(1):'-'}\t${capEff?capEff.toFixed(1):'-'}\t${isFinite(pctVs)?pctVs.toFixed(0)+'%':''}`
+        `${proc}\t${mode}\t${st.n}\t${formatSecs(ctMed)}\t${cap100?formatUnits(cap100):'-'}\t${capEff?formatUnits(capEff):'-'}\t${isFinite(pctVs)?pctVs.toFixed(0)+'%':''}`
       );
     });
 
@@ -2257,7 +2263,7 @@
         msg=`${pct.toFixed(0)}% vs contract`;
       }
       lines.push(
-        `${proc} (${mode}) – median CT ${formatSecs(ctMed)} s, capacity@Eff ${capEff?capEff.toFixed(1):'-'} units/${view} – ${msg}`
+        `${proc} (${mode}) – median CT ${formatSecs(ctMed)} s, capacity@Eff ${capEff?formatUnits(capEff):'-'} units/${view} – ${msg}`
       );
     });
 
