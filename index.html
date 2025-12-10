@@ -535,6 +535,19 @@
   <!-- CONTENIDO NORMAL -->
   <div class="content-section">
 
+    <!-- DATA CONTROLS (subido arriba de Measurement Setup) -->
+    <div class="section-card">
+      <div class="section-title" data-i18n="section.dataControls">Data Controls</div>
+      <div class="btn-row-secondary">
+        <button class="btn-small btn-small-copy" id="btnCopyAll" data-i18n="btn.copyAll">Copy All</button>
+        <button class="btn-small btn-small-summary" id="btnCopySummary" data-i18n="btn.copySummary">Copy Summary</button>
+        <button class="btn-small btn-small-manual" id="btnAddManualLap" data-i18n="btn.addManualLap">Add Manual Lap</button>
+        <button class="btn-small btn-small-reset" id="btnReset" data-i18n="btn.reset">
+          Reset
+        </button>
+      </div>
+    </div>
+
     <!-- CONFIGURACIÓN DE MEDICIÓN -->
     <div class="section-card">
       <div class="section-title" data-i18n="section.measurementSetup">
@@ -615,8 +628,7 @@
       </div>
 
     </div>
-
-    <!-- ⭐ STATS FOCUS (SE UBICA DEBAJO DE CONFIGURACIÓN) -->
+    <!-- ⭐ STATS FOCUS (DEBAJO DE CONFIGURACIÓN) -->
     <div class="section-card">
       <div class="section-title" data-i18n="section.statsFocus">
         Stats Focus
@@ -628,7 +640,7 @@
         style="margin-top:6px;font-size:.68rem;color:var(--text-muted);"
         data-i18n="stats.note">
         Simple language on purpose: few / enough samples,
-        low / high variation, normal / not normal, capable / not capable.
+        low / high variation, close to normal / not normal, capable / not capable.
       </div>
     </div>
 
@@ -724,19 +736,6 @@
         </div>
       </div>
     </div>
-    <!-- Data controls -->
-    <div class="section-card">
-      <div class="section-title" data-i18n="section.dataControls">Data Controls</div>
-      <div class="btn-row-secondary">
-        <button class="btn-small" id="btnCopyAll" data-i18n="btn.copyAll">Copy All</button>
-        <button class="btn-small" id="btnCopySummary" data-i18n="btn.copySummary">Copy Summary</button>
-        <button class="btn-small" id="btnAddManualLap" data-i18n="btn.addManualLap">Add Manual Lap</button>
-        <button class="btn-small" id="btnReset" data-i18n="btn.reset"
-          style="border:1px solid var(--accent-red);color:var(--accent-red);font-weight:700;">
-          Reset
-        </button>
-      </div>
-    </div>
 
     <!-- Raw Time Data -->
     <div class="section-card">
@@ -794,7 +793,38 @@
         </div>
       </details>
 
-      <!-- NUEVO BLOQUE: educación rápida Cp/Cpk -->
+      <!-- NUEVO BLOQUE: guía rápida de tamaño de muestra -->
+      <details class="method-details">
+        <summary data-i18n="method.sampleTitle">Sample size &amp; error – quick guide</summary>
+        <div class="method-body">
+          <p>
+            TaktLab links <strong>sample size</strong> (N), <strong>variation</strong> (CV) and the
+            <strong>estimated error</strong> of the mean at 95% confidence.
+          </p>
+          <ul>
+            <li><strong>More variation</strong> (higher CV) ⇒ you need <strong>more samples</strong>.</li>
+            <li><strong>Target in TaktLab:</strong> be close to ±3% error at 95% confidence on critical/bottleneck processes.</li>
+            <li>
+              As a rule of thumb:
+              <ul>
+                <li>Low CV (&lt;8%) → ~10 laps are usually enough.</li>
+                <li>Medium CV (8–20%) → ~15–25 laps.</li>
+                <li>High CV (&gt;20%) → ~25–40+ laps.</li>
+              </ul>
+            </li>
+            <li>
+              The banner under the stopwatch and the <strong>Stats Focus</strong> block show:
+              <strong>Sample size N / N<sub>target</sub></strong> and the estimated error (±% @95%).
+            </li>
+          </ul>
+          <p>
+            Use this as a <strong>guide</strong>, not a rigid rule. If the process is very unstable or mix changes a lot,
+            take more samples and split the studies by family or condition.
+          </p>
+        </div>
+      </details>
+
+      <!-- BLOQUE Cp/Cpk -->
       <details class="method-details">
         <summary data-i18n="method.cpTitle">Cp &amp; Cpk – quick interpretation</summary>
         <div class="method-body">
@@ -849,7 +879,6 @@
     Created by Roberto González – Contact: hzaelglez@gmail.com
   </div>
 </div>
-
 <script>
 (function(){
   const display = document.getElementById('display');
@@ -902,7 +931,6 @@
       'btn.copySummary':'Copy Summary',
       'btn.addManualLap':'Add Manual Lap',
       'btn.reset':'Reset',
-      'btn.reset':'Reset',
 
       'section.measurementSetup':'Measurement Setup',
       'section.capacityOverview':'Process Capacity Overview',
@@ -951,6 +979,7 @@
 
       'method.howTitle':'How TaktLab estimates capacity',
       'method.whatTitle':'What to enter in each field',
+      'method.sampleTitle':'Sample size & error – quick guide',
       'method.cpTitle':'Cp & Cpk – quick interpretation',
       'method.noticeTitle':'Important notice / disclaimer',
 
@@ -1016,6 +1045,7 @@
 
       'method.howTitle':'Cómo TaktLab estima la capacidad',
       'method.whatTitle':'Qué capturar en cada campo',
+      'method.sampleTitle':'Tamaño de muestra y error – guía rápida',
       'method.cpTitle':'Cp y Cpk – interpretación rápida',
       'method.noticeTitle':'Aviso importante / descargo de responsabilidad',
 
@@ -1366,8 +1396,8 @@
     if(!st || st.n < 3){
       sampleInfoDiv.className = 'sample-info sample-neutral';
       sampleInfoDiv.textContent = currentLang==='es'
-        ? `Muestras: ${st ? st.n : 0} – se requieren ≥3 vueltas antes de estimar el error.`
-        : `Samples: ${st ? st.n : 0} – need ≥3 laps before estimating error.`;
+        ? `Tamaño de muestra: ${st ? st.n : 0} / 3 – se requieren ≥3 vueltas antes de estimar el error.`
+        : `Sample size: ${st ? st.n : 0} / 3 – need ≥3 laps before estimating error.`;
       return;
     }
 
@@ -1405,21 +1435,21 @@
     }else if(ratio < 0.9){
       cls = 'sample-warn';
       msgExtra = currentLang==='es'
-        ? 'Casi llegas a ±3% – toma algunas vueltas más.'
-        : 'Almost there for ±3% – take a few more laps.';
+        ? 'Casi suficiente para ±3% – un par de vueltas más ayudarán.'
+        : 'Almost enough for ±3% – a couple more laps would help.';
     }else{
       cls = 'sample-good';
       msgExtra = currentLang==='es'
-        ? 'Tamaño de muestra suficiente para ±3% (escenario crítico).'
-        : 'Sample size is enough for ±3% (critical scenario).';
+        ? 'Tamaño de muestra suficiente para decisiones con objetivo ±3%.'
+        : 'Sample size is enough for decisions at ±3% target.';
     }
 
     const eText = isFinite(eActualPct) ? eActualPct.toFixed(1) : '—';
     sampleInfoDiv.className = 'sample-info ' + cls;
     sampleInfoDiv.textContent =
       (currentLang==='es'
-        ? `Muestras: ${n} / ${recN} · Error estimado: ±${eText}% (95%) – `
-        : `Samples: ${n} / ${recN} · Est. error: ±${eText}% (95%) – `
+        ? `Tamaño de muestra: ${n} / ${recN} · Error estimado: ±${eText}% (95%) – `
+        : `Sample size: ${n} / ${recN} · Est. error: ±${eText}% (95%) – `
       ) + msgExtra;
   }
 
@@ -1503,7 +1533,6 @@
       });
     });
   }
-
   function renderOverview(){
     overviewBody.innerHTML='';
     const groups = groupByProcess();
@@ -1794,18 +1823,18 @@
       if(ratio<0.6){
         sampleClass='focus-bad';
         sampleMsg = currentLang==='es'
-          ? `Tamaño de muestra ${n}/${recN}: muy bajo, sigue midiendo.`
-          : `Sample size ${n}/${recN}: too low, keep measuring.`;
+          ? `Tamaño de muestra: ${n} / ${recN} – muestra muy pequeña para ±3%; úsala solo como referencia.`
+          : `Sample size: ${n} / ${recN} – sample too small for ±3%; use only as reference.`;
       }else if(ratio<0.9){
         sampleClass='focus-warn';
         sampleMsg = currentLang==='es'
-          ? `Tamaño de muestra ${n}/${recN}: casi suficiente, un par de vueltas más ayudarán.`
-          : `Sample size ${n}/${recN}: almost enough, a couple more laps would help.`;
+          ? `Tamaño de muestra: ${n} / ${recN} – casi suficiente para ±3%; un par de vueltas más ayudarán.`
+          : `Sample size: ${n} / ${recN} – almost enough for ±3%; a couple more laps would help.`;
       }else{
         sampleClass='focus-good';
         sampleMsg = currentLang==='es'
-          ? `Tamaño de muestra ${n}/${recN}: suficiente para decisión rápida.`
-          : `Sample size ${n}/${recN}: good enough for a quick decision.`;
+          ? `Tamaño de muestra: ${n} / ${recN} – suficiente para decisiones con objetivo ±3%.`
+          : `Sample size: ${n} / ${recN} – enough for decisions at ±3% target.`;
       }
 
       // variación
@@ -2222,7 +2251,7 @@
     lines.push('TAKTLAB SUMMARY');
     lines.push('');
 
-    // Capacity snapshot for current process (mismo texto que arriba pero plano)
+    // Capacity snapshot for current process
     const {proc: curProc, mode: curMode} = ensureDefaults();
     const keySnap = curProc + '||' + curMode;
     const snapGroups = groupByProcess();
@@ -2347,7 +2376,7 @@
     });
 
     lines.push('');
-    // Stats focus (conclusiones)
+    // Stats focus (simple messages)
     lines.push('STATS FOCUS (SIMPLE MESSAGES)');
     groups.forEach((arr,key)=>{
       const [proc,mode]=key.split('||');
@@ -2363,9 +2392,9 @@
 
       const ratio=n/recN;
       let sampleMsg;
-      if(ratio<0.6) sampleMsg=`Samples ${n}/${recN}: too low, keep measuring.`;
-      else if(ratio<0.9) sampleMsg=`Samples ${n}/${recN}: almost enough, a few more laps help.`;
-      else sampleMsg=`Samples ${n}/${recN}: ok for quick decision.`;
+      if(ratio<0.6) sampleMsg=`Sample size ${n}/${recN}: too small for ±3%; use only as reference.`;
+      else if(ratio<0.9) sampleMsg=`Sample size ${n}/${recN}: almost enough for ±3%; a couple more laps help.`;
+      else sampleMsg=`Sample size ${n}/${recN}: enough for decisions at ±3% target.`;
 
       let varMsg;
       if(cv<0.08) varMsg=`Low std (${formatSecs(st.std)} s, ${(cv*100).toFixed(1)}%): stable process.`;
@@ -2413,10 +2442,10 @@
     renderOverview();
     renderStatsDetail();
     renderContractSummary();
-    renderCapacitySnapshot();  // NEW: snapshot actual vs potencial
+    renderCapacitySnapshot();
     renderStatsFocus();
     updateChartOptions();
-    updateSampleInfo(); // NEW: actualizar bloque bajo cronómetro
+    updateSampleInfo();
   }
 
   chartSelect.addEventListener('change',renderCharts);
