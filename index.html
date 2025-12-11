@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
 <title>TaktLab – Cycle Time & Capacity Analyzer</title>
 <style>
   :root{
@@ -748,7 +748,7 @@
               <th data-i18n="col.process">Process</th>
               <th data-i18n="col.mode">Mode</th>
               <th data-i18n="col.status">Status</th>
-              <th data-i18n="col.note">Note</th>
+              <th data-i17n="col.note">Note</th>
               <th data-i18n="col.t1">T1 (s)</th>
               <th data-i18n="col.t2">T2 (s)</th>
               <th data-i18n="col.total">Total (s)</th>
@@ -881,710 +881,492 @@
 </div>
 <script>
 (function(){
-  const display = document.getElementById('display');
-  const btnStart = document.getElementById('btnStart');
-  const btnLap = document.getElementById('btnLap');
-  const timerCard = document.getElementById('timerCard');
-  const logoGear = document.getElementById('logoGear');
-  const sampleInfoDiv = document.getElementById('sampleInfo'); // NEW
 
-  const processInput = document.getElementById('processName');
-  const modeSelect   = document.getElementById('mode');
-  const effInput     = document.getElementById('efficiency');
-  const pcdInput     = document.getElementById('contractPcd');
-  const hInput       = document.getElementById('hoursPerDay');
-  const dInput       = document.getElementById('daysPerWeek');
-  const capViewSel   = document.getElementById('capView');
+/* ============================================================
+   GLOBAL STATE
+============================================================ */
+let running = false;
+let startTime = 0;
+let lastLapTime = 0;
+let timerInterval = null;
 
-  const ringT1 = document.getElementById('ringT1');
-  const ringT2 = document.getElementById('ringT2');
-  const t1Indicator = document.getElementById('t1Indicator');
-  const t2Indicator = document.getElementById('t2Indicator');
+/* Estructura de datos por proceso:
+   {
+     "Op 30-1|CT": {
+         mode:"CT",
+         samples:[ {t1,t2,total, status, note} ],
+         stats:{...}
+     }
+   }
+*/
+let processData = {};
 
-  const overviewBody   = document.getElementById('overviewBody');
-  const statsBody      = document.getElementById('statsBody');
-  const contractSummary= document.getElementById('contractSummary');
-  const statsFocusDiv  = document.getElementById('statsFocus');
-  const capacitySnapshotDiv = document.getElementById('capacitySnapshot');
+/* Element refs */
+const display      = document.getElementById("display");
+const btnStart     = document.getElementById("btnStart");
+const btnLap       = document.getElementById("btnLap");
+const sampleInfo   = document.getElementById("sampleInfo");
+const processName  = document.getElementById("processName");
+const modeSel      = document.getElementById("mode");
+const efficiencyEl = document.getElementById("efficiency");
+const contractPcd  = document.getElementById("contractPcd");
+const hoursPerDayEl= document.getElementById("hoursPerDay");
+const daysPerWeekEl= document.getElementById("daysPerWeek");
+const capViewSel   = document.getElementById("capView");
 
-  const dataBody    = document.getElementById('dataBody');
-  const btnCopyAll  = document.getElementById('btnCopyAll');
-  const btnCopySum  = document.getElementById('btnCopySummary');
-  const btnAddMan   = document.getElementById('btnAddManualLap');
-  const btnReset    = document.getElementById('btnReset');
+const t1Indicator  = document.getElementById("t1Indicator");
+const t2Indicator  = document.getElementById("t2Indicator");
+const ringT1       = document.getElementById("ringT1");
+const ringT2       = document.getElementById("ringT2");
 
-  const chartSelect      = document.getElementById('chartProcessSelect');
-  const timeSeriesCanvas = document.getElementById('timeSeriesCanvas');
-  const histCanvas       = document.getElementById('histCanvas');
+const statsFocusDiv= document.getElementById("statsFocus");
+const contractSummaryDiv = document.getElementById("contractSummary");
+const capacitySnapshotDiv = document.getElementById("capacitySnapshot");
 
-  const langButtons = document.querySelectorAll('.lang-btn');
+const overviewBody = document.getElementById("overviewBody");
+const statsBody    = document.getElementById("statsBody");
+const dataBody     = document.getElementById("dataBody");
 
-  /* ======== i18n simple EN / ES ======== */
-  const i18n = {
-    en:{
-      'title.subtitle':'Cycle Time & Capacity Analyzer',
+const btnCopyAll      = document.getElementById("btnCopyAll");
+const btnCopySummary  = document.getElementById("btnCopySummary");
+const btnAddManualLap = document.getElementById("btnAddManualLap");
+const btnReset        = document.getElementById("btnReset");
 
-      'btn.start':'Start',
-      'btn.pause':'Pause',
-      'btn.lap':'LAP',
-      'btn.copyAll':'Copy All',
-      'btn.copySummary':'Copy Summary',
-      'btn.addManualLap':'Add Manual Lap',
-      'btn.reset':'Reset',
+const chartSelect = document.getElementById("chartProcessSelect");
 
-      'section.measurementSetup':'Measurement Setup',
-      'section.capacityOverview':'Process Capacity Overview',
-      'section.statsDetail':'Statistical Detail (per process)',
-      'section.contractSummary':'Contract vs Capacity Summary',
-      'section.charts':'Charts (selected process)',
-      'section.statsFocus':'Stats Focus',
-      'section.dataControls':'Data Controls',
-      'section.rawData':'Raw Time Data',
-      'section.methodGuide':'Method & Guide',
+const timeSeriesCanvas = document.getElementById("timeSeriesCanvas");
+const histCanvas       = document.getElementById("histCanvas");
 
-      'label.process':'Process',
-      'label.processPlaceholder':'e.g. Op 30-1',
-      'label.mode':'Mode',
-      'label.efficiency':'Efficiency %',
-      'label.contractPcd':'Contract Cap (pcs/day)',
-      'label.hoursPerDay':'Hours / Day',
-      'label.daysPerWeek':'Days / Week',
-      'label.capView':'Capacity View',
-      'label.chartProcessLabel':'Process / Mode:',
+let timeSeriesChart = null;
+let histChart       = null;
 
-      'mode.ct':'Cycle Time (CT)',
-      'mode.mld':'Machine & Load/Unload',
+/* Logo Gear animado */
+const logoGear = document.getElementById("logoGear");
 
-      'capView.hour':'per Hour',
-      'capView.day':'per Day',
-      'capView.week':'per Week',
+/* ============================================================
+   VIBRATION + FLASH EFFECTS
+============================================================ */
+function smallVibration(){
+  if (navigator.vibrate){
+    try{ navigator.vibrate(35); }catch(e){}
+  }
+}
 
-      'mini.t1Label':'T1 – Machine',
-      'mini.t2Label':'T2 – Load/Unload',
+function flashCard(){
+  const card = document.getElementById("timerCard");
+  if (!card) return;
+  card.classList.add("flash");
+  setTimeout(()=>card.classList.remove("flash"),120);
+}
 
-      'col.index':'#',
-      'col.process':'Process',
-      'col.mode':'Mode',
-      'col.status':'Status',
-      'col.note':'Note',
-      'col.t1':'T1 (s)',
-      'col.t2':'T2 (s)',
-      'col.total':'Total (s)',
-      'col.edit':'Edit',
-      'col.del':'Del',
-      'col.n':'N',
+/* ============================================================
+   TIMER
+============================================================ */
+function formatTime(ms){
+  const totalSeconds = ms/1000;
+  const minutes = Math.floor(totalSeconds/60);
+  const seconds = (totalSeconds % 60).toFixed(2).padStart(5,"0");
+  return `${String(minutes).padStart(2,"0")}:${seconds}`;
+}
 
-      'chart.timeSeriesTitle':'Time Series with Mean, Median, ±3σ',
-      'chart.histTitle':'Histogram with Median & Percentiles',
+function updateDisplay(){
+  const now = performance.now();
+  const elapsed = now - startTime;
+  display.textContent = formatTime(elapsed);
+}
 
-      'method.howTitle':'How TaktLab estimates capacity',
-      'method.whatTitle':'What to enter in each field',
-      'method.sampleTitle':'Sample size & error – quick guide',
-      'method.cpTitle':'Cp & Cpk – quick interpretation',
-      'method.noticeTitle':'Important notice / disclaimer',
+function startTimer(){
+  running = true;
+  startTime = performance.now();
+  lastLapTime = startTime;
 
-      'stats.note':'Simple language on purpose: few / enough samples, low / high variation, close to normal / not normal, capable / not capable.',
+  logoGear.classList.add("spinning");
 
-      'footer.note':'Created by Roberto González – Contact: hzaelglez@gmail.com'
-    },
-    es:{
-      'title.subtitle':'Analizador de Tiempo de Ciclo y Capacidad',
+  timerInterval = setInterval(updateDisplay,10);
 
-      'btn.start':'Iniciar',
-      'btn.pause':'Pausar',
-      'btn.lap':'VUELTA',
-      'btn.copyAll':'Copiar todo',
-      'btn.copySummary':'Copiar resumen',
-      'btn.addManualLap':'Agregar vuelta manual',
-      'btn.reset':'Reiniciar',
+  btnStart.textContent = currentLang==="es" ? "Stop" : "Stop";
+}
 
-      'section.measurementSetup':'Configuración de Medición',
-      'section.capacityOverview':'Resumen de Capacidad por Proceso',
-      'section.statsDetail':'Detalle Estadístico (por proceso)',
-      'section.contractSummary':'Resumen Contrato vs Capacidad',
-      'section.charts':'Gráficas (proceso seleccionado)',
-      'section.statsFocus':'Enfoque Estadístico',
-      'section.dataControls':'Controles de Datos',
-      'section.rawData':'Datos Crudos de Tiempo',
-      'section.methodGuide':'Método y Guía',
+function stopTimer(){
+  running = false;
+  logoGear.classList.remove("spinning");
 
-      'label.process':'Proceso',
-      'label.processPlaceholder':'p. ej. Op 30-1',
-      'label.mode':'Modo',
-      'label.efficiency':'Eficiencia %',
-      'label.contractPcd':'Capacidad contrato (pzs/día)',
-      'label.hoursPerDay':'Horas / día',
-      'label.daysPerWeek':'Días / semana',
-      'label.capView':'Vista de capacidad',
-      'label.chartProcessLabel':'Proceso / Modo:',
+  clearInterval(timerInterval);
+  timerInterval = null;
 
-      'mode.ct':'Tiempo de ciclo (CT)',
-      'mode.mld':'Máquina y Carga/Descarga',
+  btnStart.textContent = currentLang==="es" ? "Start" : "Start";
+  updateDisplay();
+}
 
-      'capView.hour':'por hora',
-      'capView.day':'por día',
-      'capView.week':'por semana',
+/* ============================================================
+   ADD LAP (MANUAL O AUTOMÁTICO)
+============================================================ */
+function addLap(manual=false){
+  const now = performance.now();
+  const lapMs = now - lastLapTime;
+  lastLapTime = now;
 
-      'mini.t1Label':'T1 – Máquina',
-      'mini.t2Label':'T2 – Carga/Descarga',
+  const proc = processName.value.trim() || "(no name)";
+  const mode = modeSel.value;
+  const key = `${proc}|${mode}`;
 
-      'col.index':'#',
-      'col.process':'Proceso',
-      'col.mode':'Modo',
-      'col.status':'Estatus',
-      'col.note':'Nota',
-      'col.t1':'T1 (s)',
-      'col.t2':'T2 (s)',
-      'col.total':'Total (s)',
-      'col.edit':'Editar',
-      'col.del':'Borrar',
-      'col.n':'N',
-
-      'chart.timeSeriesTitle':'Serie de tiempo con media, mediana y ±3σ',
-      'chart.histTitle':'Histograma con mediana y percentiles',
-
-      'method.howTitle':'Cómo TaktLab estima la capacidad',
-      'method.whatTitle':'Qué capturar en cada campo',
-      'method.sampleTitle':'Tamaño de muestra y error – guía rápida',
-      'method.cpTitle':'Cp y Cpk – interpretación rápida',
-      'method.noticeTitle':'Aviso importante / descargo de responsabilidad',
-
-      'stats.note':'Lenguaje simple a propósito: pocas / suficientes muestras, baja / alta variación, cercano / no cercano a normal, capaz / no capaz.',
-
-      'footer.note':'Creado por Roberto González – Contacto: hzaelglez@gmail.com'
-    }
+  if (!processData[key]) processData[key] = {
+    mode,
+    samples:[],
+    stats:{}
   };
 
-  function t(key){
-    return (i18n[currentLang] && i18n[currentLang][key]) ||
-           (i18n.en[key]) ||
-           key;
+  // Si es MLD separamos T1 y T2
+  let t1 = 0, t2 = 0;
+  if (mode==="MLD"){
+    t1 = parseFloat(prompt(currentLang==="es"
+      ? "Ingresa T1 (Machine) en segundos:"
+      : "Enter T1 (Machine) in seconds:","0")) || 0;
+    t2 = parseFloat(prompt(currentLang==="es"
+      ? "Ingresa T2 (Load/Unload) en segundos:"
+      : "Enter T2 (Load/Unload) in seconds:","0")) || 0;
   }
 
-  let currentLang = localStorage.getItem('taktlabLang') || 'en';
+  const total = mode==="MLD" ? t1+t2 : lapMs/1000;
 
-  function applyTranslations(){
-    document.querySelectorAll('[data-i18n]').forEach(el=>{
-      const key = el.dataset.i18n;
-      if(!key) return;
-      const txt = t(key);
-      // El botón Start lo ajustamos aparte según corra o no
-      if(el === btnStart) return;
-      el.textContent = txt;
-    });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
-      const key = el.dataset.i18nPlaceholder;
-      if(!key) return;
-      const txt = t(key);
-      if(txt) el.placeholder = txt;
-    });
-  }
-
-  function updateLangButtons(){
-    langButtons.forEach(b=>{
-      b.classList.toggle('active', b.dataset.lang === currentLang);
-    });
-  }
-
-  function setLanguage(lang){
-    currentLang = (lang === 'es') ? 'es' : 'en';
-    localStorage.setItem('taktlabLang', currentLang);
-    document.documentElement.lang = currentLang;
-    updateLangButtons();
-    applyTranslations();
-    // Ajustar texto del botón Start/Pause según estado
-    if(running){
-      btnStart.textContent = t('btn.pause');
-    }else{
-      btnStart.textContent = t('btn.start');
-    }
-    // Re-render para que textos dinámicos también cambien
-    renderAll();
-  }
-
-  langButtons.forEach(btn=>{
-    btn.addEventListener('click',()=> setLanguage(btn.dataset.lang));
+  processData[key].samples.push({
+    t1, t2, total,
+    status: manual ? "manual" : "auto",
+    note:""
   });
 
-  let running = false;
-  let startTime = 0;
-  let elapsed = 0;
-  let timerId = null;
+  smallVibration();
+  flashCard();
 
-  let laps = []; // {id,process,mode,status,note,t1,t2,total}
-  let nextId = 1;
-  let pendingT1 = null; // para MLD
+  refreshTables();
+  refreshStatsFocus();
+  refreshContractSummary();
+  refreshCharts();
+  updateSampleBanner(key);
+}
 
-  function pad2(n){return n<10?'0'+n:''+n;}
-  function formatTime(ms){
-    const total = Math.max(ms,0);
-    const mins = Math.floor(total/60000);
-    const secs = Math.floor((total%60000)/1000);
-    const cent = Math.floor((total%1000)/10);
-    return pad2(mins)+':'+pad2(secs)+'.'+pad2(cent);
-  }
-  function formatSecs(s){
-    if(!isFinite(s)) return '-';
-    return (Math.round(s*10)/10).toFixed(1);
-  }
-  // NUEVO: formateo para piezas / capacidad (enteros + coma de miles)
-  function formatUnits(n){
-    if(!isFinite(n)) return '-';
-    const rounded = Math.round(n);
-    return rounded.toLocaleString('en-US',{maximumFractionDigits:0});
+/* ============================================================
+   SAMPLE BANNER – UNIFICADO
+============================================================ */
+function updateSampleBanner(key){
+  const d = processData[key];
+  if (!d || d.samples.length===0){
+    sampleInfo.className="sample-info sample-neutral";
+    sampleInfo.textContent = currentLang==="es"
+      ? "Aún no hay muestras en este proceso. Inicia capturas."
+      : "No samples yet for current process. Start capturing laps.";
+    return;
   }
 
-  function updateDisplay(){
-    display.textContent = formatTime(elapsed);
+  // Calcular error estimado ±Z·σ/√N (95% → 1.96)
+  const Z = 1.96;
+  const times = d.samples.map(s=>s.total);
+  const N = times.length;
+  const mean = times.reduce((a,b)=>a+b,0)/N;
+  const variance = times.reduce((a,b)=>a+(b-mean)**2,0)/N;
+  const std = Math.sqrt(variance);
+  const estError = (Z * std / Math.sqrt(N)) / mean * 100;  // %
+
+  const targetError = 3; // objetivo ±3%
+  let cls = "sample-neutral";
+  if (estError<=targetError) cls="sample-good";
+  else if (estError <= targetError*2) cls="sample-warn";
+  else cls="sample-bad";
+
+  sampleInfo.className = `sample-info ${cls}`;
+
+  const msg = currentLang==="es"
+    ? `Muestras: ${N} · Error estimado: ±${estError.toFixed(1)}% (95%)`
+      + (estError<=3
+         ? " – adecuado para decisiones."
+         : " – muestra insuficiente para ±3%, usar solo como referencia.")
+    : `Samples: ${N} · Est. error: ±${estError.toFixed(1)}% (95%)`
+      + (estError<=3
+         ? " – enough for decisions."
+         : " – too small for ±3%, use only as reference.");
+
+  sampleInfo.textContent = msg;
+}
+/* ============================================================
+   RECONSTRUCCIÓN DE ESTADÍSTICAS PARA CADA PROCESO
+============================================================ */
+function computeStatsForProcess(key){
+  const d = processData[key];
+  if (!d || d.samples.length===0){
+    d.stats = {};
+    return;
   }
 
-  function refreshRingStates(){
-    const mode = modeSelect.value;
-    if(!running){
-      ringT1.classList.add('paused');
-      ringT2.classList.add('paused');
-      logoGear.classList.remove('spinning');
-      return;
-    }
-    logoGear.classList.add('spinning');
-    if(mode === 'CT'){
-      ringT1.classList.remove('paused');
-      ringT2.classList.add('paused');
-    }else{
-      if(pendingT1 === null){
-        ringT1.classList.remove('paused');
-        ringT2.classList.add('paused');
-      }else{
-        ringT1.classList.add('paused');
-        ringT2.classList.remove('paused');
-      }
-    }
+  const samples = d.samples.map(s=>s.total);
+  const N = samples.length;
+
+  // Media
+  const mean = samples.reduce((a,b)=>a+b,0)/N;
+
+  // Mediana
+  const sorted = [...samples].sort((a,b)=>a-b);
+  let median = 0;
+  if (N%2===0) median = (sorted[N/2 -1] + sorted[N/2]) / 2;
+  else median = sorted[(N-1)/2];
+
+  // Percentiles
+  const p10 = sorted[Math.floor(0.10*(N-1))];
+  const p90 = sorted[Math.floor(0.90*(N-1))];
+
+  // Min y Max
+  const min = sorted[0];
+  const max = sorted[sorted.length-1];
+
+  // Std dev
+  const variance = samples.reduce((a,b)=>a+(b-mean)**2,0)/N;
+  const std = Math.sqrt(variance);
+
+  // CV%
+  const cv = (std/mean)*100;
+
+  // Target CT calculado desde contrato
+  const hours = parseFloat(hoursPerDayEl.value)||8;
+  const contract = parseFloat(contractPcd.value)||0;
+  let ctTarget = 0;
+  if (contract>0){
+    ctTarget = (hours*3600)/contract; // segundos
+  } else {
+    ctTarget = median*0.9; // fallback
   }
 
-  function tick(){
-    const now = performance.now();
-    elapsed = now - startTime;
-    updateDisplay();
-
-    const mode = modeSelect.value;
-    const secs = Math.max(elapsed/1000,0);
-
-    if(running && mode === 'MLD'){
-      if (pendingT1 === null) {
-        t1Indicator.textContent = formatSecs(secs) + ' s';
-      } else {
-        const t2 = secs;
-        t2Indicator.textContent = formatSecs(t2) + ' s';
-      }
-    } else if(running && mode === 'CT'){
-      t1Indicator.textContent = formatSecs(secs) + ' s';
-    }
-
-    timerId = requestAnimationFrame(tick);
+  // Cp / Cpk
+  const USL = ctTarget;
+  const LSL = 0;
+  let Cp=0, Cpk=0;
+  if (std>0){
+    Cp = (USL - LSL)/(6*std);
+    const Cpu = (USL - mean)/(3*std);
+    const Cpl = (mean - LSL)/(3*std);
+    Cpk = Math.min(Cpu,Cpl);
   }
 
-  function start(){
-    if(running) return;
-    running = true;
-    startTime = performance.now() - elapsed;
-    timerId = requestAnimationFrame(tick);
-    btnStart.textContent = t('btn.pause');
-    refreshRingStates();
+  d.stats = {
+    N, mean, median, p10, p90, min, max,
+    std, cv, Cp, Cpk, ctTarget
+  };
+}
+
+/* ============================================================
+   RECONSTRUIR TODAS LAS TABLAS
+============================================================ */
+function refreshTables(){
+  overviewBody.innerHTML="";
+  statsBody.innerHTML="";
+  dataBody.innerHTML="";
+  chartSelect.innerHTML="";
+
+  for (const key of Object.keys(processData)){
+    computeStatsForProcess(key);
   }
 
-  function pause(){
-    if(!running) return;
-    running = false;
-    cancelAnimationFrame(timerId);
-    timerId = null;
-    btnStart.textContent = t('btn.start');
-    refreshRingStates();
-  }
+  // Llenar tablas
+  for (const key of Object.keys(processData)){
+    const d = processData[key];
+    const stats = d.stats || {};
+    const [proc, mode] = key.split("|");
 
-  btnStart.addEventListener('click',()=>{
-    if(running) pause(); else start();
-  });
+    /* ------------------------
+       OVERVIEW TABLE
+    ------------------------ */
+    if (stats.N>0){
+      const hours = parseFloat(hoursPerDayEl.value)||8;
+      const eff   = (parseFloat(efficiencyEl.value)||100)/100;
 
-  function smallVibration(){
-    if(navigator.vibrate){
-      try{navigator.vibrate(35);}catch(e){}
-    }
-  }
-  function flashCard(){
-    timerCard.classList.add('flash');
-    setTimeout(()=>timerCard.classList.remove('flash'),120);
-  }
+      const ctmed = stats.median;
+      const cap100ph = ctmed>0 ? 3600/ctmed : 0;
+      const capEffph = cap100ph * eff;
 
-  function ensureDefaults(){
-    let proc = (processInput.value||'').trim();
-    if(!proc){
-      proc = currentLang==='es' ? 'Proceso 1' : 'Process 1';
-      processInput.value = proc;
-    }
-    let mode = modeSelect.value || 'CT';
-    modeSelect.value = mode;
-    return {proc,mode};
-  }
+      const contract = parseFloat(contractPcd.value)||0;
+      const pctVs = contract>0 ? (capEffph*hours)/contract*100 : 0;
 
-  function addLap(manualData){
-    const {proc,mode} = ensureDefaults();
-    const status = '';
-    const note = '';
-
-    if(manualData){
-      const {t1,t2,total} = manualData;
-      laps.push({id:nextId++,process:proc,mode,status,note,t1,t2,total});
-      renderAll();
-      return;
-    }
-
-    const seconds = Math.max(elapsed/1000,0);
-
-    if(mode === 'CT'){
-      laps.push({
-        id:nextId++,
-        process:proc,
-        mode,
-        status,
-        note,
-        t1:seconds,
-        t2:0,
-        total:seconds
-      });
-      elapsed = 0;
-      startTime = performance.now();   // FIX: reiniciar base de tiempo
-      updateDisplay();
-      t1Indicator.textContent='0.0 s';
-      t2Indicator.textContent='0.0 s';
-      pendingT1 = null;
-      refreshRingStates();
-      renderAll();
-      return;
-    }
-
-    // Machine & Load/Unload (T1 primero, luego T2)
-    if(pendingT1 === null){
-      pendingT1 = seconds;
-      t1Indicator.textContent = formatSecs(pendingT1)+' s';
-      elapsed = 0;
-      startTime = performance.now();
-      refreshRingStates();
-    }else{
-      const t2 = seconds;
-      const t1 = pendingT1;
-      const total = t1 + t2;
-      laps.push({id:nextId++,process:proc,mode,status,note,t1,t2,total});
-      pendingT1 = null;
-      t1Indicator.textContent='0.0 s';
-      t2Indicator.textContent='0.0 s';
-      elapsed = 0;
-      startTime = performance.now();   // FIX: reiniciar base de tiempo
-      updateDisplay();
-      refreshRingStates();
-      renderAll();
-    }
-  }
-
-  btnLap.addEventListener('click',()=>{
-    smallVibration();
-    flashCard();
-    addLap();
-  });
-
-  btnAddMan.addEventListener('click',()=>{
-    const promptT1 = currentLang==='es'
-      ? 'T1 (s) – deja vacío si no aplica'
-      : 'T1 (s) – leave blank if not used';
-    const promptT2 = currentLang==='es'
-      ? 'T2 (s) – deja vacío si no aplica'
-      : 'T2 (s) – leave blank if not used';
-    const t1 = parseFloat(prompt(promptT1,''));
-    const t2 = parseFloat(prompt(promptT2,''));
-    if(isNaN(t1) && isNaN(t2)) return;
-    const v1 = isNaN(t1)?0:t1;
-    const v2 = isNaN(t2)?0:t2;
-    addLap({t1:v1,t2:v2,total:v1+v2});
-  });
-
-  btnReset.addEventListener('click',()=>{
-    pause();
-    elapsed = 0;
-    updateDisplay();
-    laps = [];
-    nextId = 1;
-    pendingT1 = null;
-    t1Indicator.textContent='0.0 s';
-    t2Indicator.textContent='0.0 s';
-    refreshRingStates();
-    renderAll();
-  });
-
-  modeSelect.addEventListener('change',()=>{
-    pendingT1 = null;
-    t1Indicator.textContent='0.0 s';
-    t2Indicator.textContent='0.0 s';
-    refreshRingStates();
-  });
-
-  function groupByProcess(){
-    const map = new Map();
-    laps.forEach(l=>{
-      const key = l.process+'||'+l.mode;
-      if(!map.has(key)) map.set(key,[]);
-      map.get(key).push(l);
-    });
-    return map;
-  }
-
-  function percentile(values,p){
-    const n = values.length;
-    if(n===0) return NaN;
-    if(n===1) return values[0];
-    const idx = (n-1)*p;
-    const lo = Math.floor(idx);
-    const hi = Math.ceil(idx);
-    if(lo===hi) return values[lo];
-    return values[lo] + (values[hi]-values[lo])*(idx-lo);
-  }
-
-  function calcStats(arr){
-    if(!arr.length) return null;
-    const values = arr.map(x=>x.total).slice().sort((a,b)=>a-b);
-    const n = values.length;
-    const mean = values.reduce((s,v)=>s+v,0)/n;
-    const median = n%2?values[(n-1)/2]:(values[n/2-1]+values[n/2])/2;
-    const min = values[0];
-    const max = values[n-1];
-    const variance = values.reduce((s,v)=>s+Math.pow(v-mean,2),0)/(n-1||1);
-    const std = Math.sqrt(variance);
-    const p10 = percentile(values,0.1);
-    const p90 = percentile(values,0.9);
-    const q1  = percentile(values,0.25);
-    const q3  = percentile(values,0.75);
-    const cv  = mean ? std/mean : 0;
-    return {n,values,mean,median,min,max,std,p10,p90,q1,q3,cv};
-  }
-
-  function computeCtTargetSeconds(){
-    const pcd   = parseFloat(pcdInput.value)||0;
-    const hours = Math.min(Math.max(parseFloat(hInput.value)||8,1),24);
-    if(pcd<=0) return null;
-    const secondsPerDay = hours*3600;
-    return secondsPerDay/pcd;
-  }
-
-  /* NEW: cálculo de tamaño de muestra / error para el proceso activo */
-  function updateSampleInfo(){
-    if(!sampleInfoDiv) return;
-
-    const groups = groupByProcess();
-    const {proc,mode} = ensureDefaults();
-    const key = proc+'||'+mode;
-    const arr = groups.get(key) || [];
-
-    // Sin datos
-    if(!arr.length){
-      sampleInfoDiv.className = 'sample-info sample-neutral';
-      sampleInfoDiv.textContent =
-        currentLang==='es'
-          ? 'Aún no hay muestras para el proceso actual. Comienza a tomar vueltas.'
-          : 'No samples yet for current process. Start capturing laps.';
-      return;
-    }
-
-    const st = calcStats(arr);
-    if(!st || st.n < 3){
-      sampleInfoDiv.className = 'sample-info sample-neutral';
-      sampleInfoDiv.textContent = currentLang==='es'
-        ? `Tamaño de muestra: ${st ? st.n : 0} / 3 – se requieren ≥3 vueltas antes de estimar el error.`
-        : `Sample size: ${st ? st.n : 0} / 3 – need ≥3 laps before estimating error.`;
-      return;
-    }
-
-    const n = st.n;
-    const cv = st.cv || 0;
-
-    // Configuración: escenario crítico → error objetivo 3% @95%
-    const Z = 1.96;
-    const targetError = 0.03; // 3%
-
-    let recN;
-    let eActualRel;
-
-    if(cv === 0){
-      // Todos los tiempos iguales: variación cero (en la práctica, error ~0)
-      recN = Math.max(10,n);
-      eActualRel = 0;
-    }else{
-      recN = Math.ceil(Math.pow((Z * cv) / targetError, 2));
-      if(recN < 10) recN = 10; // mínimo operativo
-      eActualRel = (Z * cv) / Math.sqrt(n);
-    }
-
-    const eActualPct = eActualRel * 100;
-    const ratio = n / recN;
-
-    let cls = 'sample-warn';
-    let msgExtra = '';
-
-    if(ratio < 0.6){
-      cls = 'sample-bad';
-      msgExtra = currentLang==='es'
-        ? 'Muestra muy pequeña para ±3% – úsala solo como referencia.'
-        : 'Sample too small for ±3% – use only as reference.';
-    }else if(ratio < 0.9){
-      cls = 'sample-warn';
-      msgExtra = currentLang==='es'
-        ? 'Casi suficiente para ±3% – un par de vueltas más ayudarán.'
-        : 'Almost enough for ±3% – a couple more laps would help.';
-    }else{
-      cls = 'sample-good';
-      msgExtra = currentLang==='es'
-        ? 'Tamaño de muestra suficiente para decisiones con objetivo ±3%.'
-        : 'Sample size is enough for decisions at ±3% target.';
-    }
-
-    const eText = isFinite(eActualPct) ? eActualPct.toFixed(1) : '—';
-    sampleInfoDiv.className = 'sample-info ' + cls;
-    sampleInfoDiv.textContent =
-      (currentLang==='es'
-        ? `Tamaño de muestra: ${n} / ${recN} · Error estimado: ±${eText}% (95%) – `
-        : `Sample size: ${n} / ${recN} · Est. error: ±${eText}% (95%) – `
-      ) + msgExtra;
-  }
-
-  function renderDataTable(){
-    dataBody.innerHTML='';
-
-    const statusOptions = currentLang==='es'
-      ? ['','Falta material','Bloqueado','Mtto']
-      : ['','Starved','Blocked','DT Maint'];
-
-    laps.forEach((lap,i)=>{
-      const tr = document.createElement('tr');
-      const statusSelectHtml = `
-        <select class="status-select" data-id="${lap.id}">
-          ${statusOptions.map(opt=>{
-            const sel = opt===lap.status?'selected':'';
-            return `<option value="${opt}" ${sel}>${opt}</option>`;
-          }).join('')}
-        </select>
-      `;
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${lap.process}</td>
-        <td>${lap.mode}</td>
-        <td>${statusSelectHtml}</td>
-        <td>
-          <input type="text"
-                 class="note-input"
-                 data-id="${lap.id}"
-                 value="${lap.note||''}"
-                 style="width:120px;background:#020b1a;border-radius:6px;border:1px solid var(--border-soft);color:var(--text-soft);font-size:.72rem;padding:2px 4px;">
-        </td>
-        <td>${formatSecs(lap.t1)}</td>
-        <td>${formatSecs(lap.t2)}</td>
-        <td>${formatSecs(lap.total)}</td>
-        <td><button class="btn-edit" data-id="${lap.id}">${currentLang==='es' ? 'Editar' : 'Edit'}</button></td>
-        <td><button class="btn-del" data-id="${lap.id}">X</button></td>
-      `;
-      dataBody.appendChild(tr);
-    });
-
-    // listeners
-    dataBody.querySelectorAll('.btn-del').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        const id = parseInt(btn.dataset.id,10);
-        laps = laps.filter(l=>l.id!==id);
-        renderAll();
-      });
-    });
-
-    dataBody.querySelectorAll('.btn-edit').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        const id = parseInt(btn.dataset.id,10);
-        const lap = laps.find(l=>l.id===id);
-        if(!lap) return;
-        const msgT1 = currentLang==='es' ? 'Editar T1 (s)' : 'Edit T1 (s)';
-        const msgT2 = currentLang==='es' ? 'Editar T2 (s)' : 'Edit T2 (s)';
-        const t1 = parseFloat(prompt(msgT1, lap.t1.toFixed(2)));
-        const t2 = parseFloat(prompt(msgT2, lap.t2.toFixed(2)));
-        if(isNaN(t1) && isNaN(t2)) return;
-        if(!isNaN(t1)) lap.t1 = t1;
-        if(!isNaN(t2)) lap.t2 = t2;
-        lap.total = lap.t1 + lap.t2;
-        renderAll();
-      });
-    });
-
-    dataBody.querySelectorAll('.status-select').forEach(sel=>{
-      sel.addEventListener('change',()=>{
-        const id = parseInt(sel.dataset.id,10);
-        const lap = laps.find(l=>l.id===id);
-        if(lap) lap.status = sel.value;
-      });
-    });
-
-    dataBody.querySelectorAll('.note-input').forEach(inp=>{
-      inp.addEventListener('change',()=>{
-        const id = parseInt(inp.dataset.id,10);
-        const lap = laps.find(l=>l.id===id);
-        if(lap) lap.note = inp.value;
-      });
-    });
-  }
-  function renderOverview(){
-    overviewBody.innerHTML='';
-    const groups = groupByProcess();
-    const eff = Math.min(Math.max(parseFloat(effInput.value)||100,10),100);
-    const hours = Math.min(Math.max(parseFloat(hInput.value)||8,1),24);
-    const days  = Math.min(Math.max(parseInt(dInput.value)||5,1),7);
-    const pcd   = parseFloat(pcdInput.value)||0;
-    const view  = capViewSel.value;
-
-    groups.forEach((arr,key)=>{
-      const [proc,mode] = key.split('||');
-      const st = calcStats(arr);
-      if(!st) return;
-      const ctMed = st.median;
-      let cap100 = 0;
-      if(ctMed>0){
-        const perHour = 3600/ctMed;
-        if(view==='hour') cap100 = perHour;
-        else if(view==='day') cap100 = perHour*hours;
-        else cap100 = perHour*hours*days;
-      }
-      const capEff = cap100*(eff/100);
-
-      let contractUnits = 0;
-      if(pcd>0){
-        if(view==='hour') contractUnits = (pcd/hours)||0;
-        else if(view==='day') contractUnits = pcd;
-        else contractUnits = pcd*days;
-      }
-      let pctVs = contractUnits>0 ? (capEff/contractUnits*100) : 0;
-      let badgeClass = '';
-      let badgeText = '';
-      if(contractUnits>0){
-        if(pctVs<85){badgeClass='badge-bad';badgeText=pctVs.toFixed(0)+'%';}
-        else if(pctVs<100){badgeClass='badge-warn';badgeText=pctVs.toFixed(0)+'%';}
-        else{badgeClass='badge-good';badgeText=pctVs.toFixed(0)+'%';}
-      }
-
-      const tr = document.createElement('tr');
+      const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${proc}</td>
         <td>${mode}</td>
-        <td>${st.n}</td>
-        <td>${formatSecs(ctMed)}</td>
-        <td>${cap100?formatUnits(cap100):'-'}</td>
-        <td>${capEff?formatUnits(capEff):'-'}</td>
-        <td>${contractUnits>0?`<span class="badge ${badgeClass}">${badgeText}</span>`:'-'}</td>
+        <td>${stats.N}</td>
+        <td>${ctmed.toFixed(2)}</td>
+        <td>${cap100ph.toFixed(1)}</td>
+        <td>${capEffph.toFixed(1)}</td>
+        <td>${pctVs.toFixed(0)}%</td>
       `;
       overviewBody.appendChild(tr);
-    });
+    }
+
+    /* ------------------------
+       STATS TABLE
+    ------------------------ */
+    if (stats.N>0){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${proc}</td>
+        <td>${mode}</td>
+        <td>${stats.N}</td>
+        <td>${stats.mean.toFixed(2)}</td>
+        <td>${stats.median.toFixed(2)}</td>
+        <td>${stats.p10.toFixed(2)}</td>
+        <td>${stats.p90.toFixed(2)}</td>
+        <td>${stats.min.toFixed(2)}</td>
+        <td>${stats.max.toFixed(2)}</td>
+        <td>${stats.std.toFixed(2)}</td>
+        <td>${stats.cv.toFixed(1)}%</td>
+        <td>${stats.Cp.toFixed(2)}</td>
+        <td>${stats.Cpk.toFixed(2)}</td>
+      `;
+      statsBody.appendChild(tr);
+    }
+
+    /* ------------------------
+       RAW DATA TABLE
+    ------------------------ */
+    for (let i=0; i<d.samples.length; i++){
+      const s = d.samples[i];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${proc}</td>
+        <td>${mode}</td>
+        <td>${s.status}</td>
+        <td>${s.note||""}</td>
+        <td>${s.t1.toFixed(2)}</td>
+        <td>${s.t2.toFixed(2)}</td>
+        <td>${s.total.toFixed(2)}</td>
+        <td><button class="btn-edit" onclick="editSample('${key}',${i})">✎</button></td>
+        <td><button class="btn-del" onclick="deleteSample('${key}',${i})">✖</button></td>
+      `;
+      dataBody.appendChild(tr);
+    }
+
+    /* ------------------------
+       CHART PROCESS SELECT
+    ------------------------ */
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = `${proc} (${mode})`;
+    chartSelect.appendChild(opt);
   }
 
+  refreshCharts();
+}
+
+/* ============================================================
+   FUNCIONES PARA EDITAR / BORRAR SAMPLES
+============================================================ */
+window.editSample = function(key, index){
+  const d = processData[key];
+  if (!d) return;
+  const s = d.samples[index];
+  if (!s) return;
+
+  const newNote = prompt(
+    currentLang==="es" ? "Editar nota:" : "Edit note:",
+    s.note || ""
+  );
+  if (newNote !== null){
+    s.note = newNote;
+  }
+  refreshTables();
+  refreshStatsFocus();
+  refreshContractSummary();
+};
+
+window.deleteSample = function(key, index){
+  const d = processData[key];
+  if (!d) return;
+  d.samples.splice(index,1);
+  refreshTables();
+  refreshStatsFocus();
+  refreshContractSummary();
+};
+
+/* ============================================================
+   STATS FOCUS — BLOQUE COMBINADO (TU NUEVO FORMATO)
+============================================================ */
+function refreshStatsFocus(){
+  statsFocusDiv.innerHTML = "";
+
+  for (const key of Object.keys(processData)){
+    const d = processData[key];
+    if (!d || d.samples.length===0) continue;
+    const stats = d.stats;
+    const [proc, mode] = key.split("|");
+
+    const N = stats.N;
+    const med = stats.median;
+    const mean = stats.mean;
+    const std = stats.std;
+    const cv = stats.cv;
+    const Cp = stats.Cp;
+    const Cpk = stats.Cpk;
+
+    const good = (txt)=>`<div class="focus-line focus-good">${txt}</div>`;
+    const warn = (txt)=>`<div class="focus-line focus-warn">${txt}</div>`;
+    const bad  = (txt)=>`<div class="focus-line focus-bad">${txt}</div>`;
+
+    let blk = `<div style="margin-bottom:8px;"><strong>${proc} (${mode})</strong></div>`;
+
+    /* -------- Tamaño de muestra -------- */
+    if (N>=10) blk += good(
+      currentLang==="es"
+        ? `Tamaño de muestra: ${N} – suficiente para decisiones con objetivo ±3%.`
+        : `Sample size: ${N} – enough for ±3% decisions.`
+    );
+    else blk += bad(
+      currentLang==="es"
+        ? `Tamaño de muestra: ${N} – insuficiente, tomar más datos.`
+        : `Sample size: ${N} – too small, add more laps.`
+    );
+
+    /* -------- Std dev -------- */
+    blk += (std<=0.08*mean)
+      ? good(
+          currentLang==="es"
+            ? `Std dev ≈ ${std.toFixed(2)} s (${cv.toFixed(1)}%). Baja variación — proceso estable.`
+            : `Std dev ≈ ${std.toFixed(2)} s (${cv.toFixed(1)}%). Low variation — process stable.`
+        )
+      : warn(
+          currentLang==="es"
+            ? `Std dev ≈ ${std.toFixed(2)} s (${cv.toFixed(1)}%). Variación algo alta.`
+            : `Std dev ≈ ${std.toFixed(2)} s (${cv.toFixed(1)}%). Variation somewhat high.`
+        );
+
+    /* -------- Media/Mediana -------- */
+    blk += good(
+      currentLang==="es"
+        ? `Media ≈ ${mean.toFixed(1)} s, Mediana ≈ ${med.toFixed(1)} s. Distribución cercana a normal.`
+        : `Mean ≈ ${mean.toFixed(1)} s, Median ≈ ${med.toFixed(1)} s. Distribution close to normal.`
+    );
+
+    /* -------- Capability -------- */
+    if (Cpk >= 1.33){
+      blk += good(
+        currentLang==="es"
+          ? `Cp=${Cp.toFixed(2)}, Cpk=${Cpk.toFixed(2)} → Proceso capaz vs objetivo.`
+          : `Cp=${Cp.toFixed(2)}, Cpk=${Cpk.toFixed(2)} → Capable vs target.`
+      );
+    }
+    else if (Cpk >= 1.00){
+      blk += warn(
+        currentLang==="es"
+          ? `Cp=${Cp.toFixed(2)}, Cpk=${Cpk.toFixed(2)} → Proceso borderline.`
+          : `Cp=${Cp.toFixed(2)}, Cpk=${Cpk.toFixed(2)} → Borderline capability.`
+      );
+    }
+    else{
+      blk += bad(
+        currentLang==="es"
+          ? `Cp=${Cp.toFixed(2)}, Cpk=${Cpk.toFixed(2)} → Proceso NO capaz vs objetivo — enfocar aquí.`
+          : `Cp=${Cp.toFixed(2)}, Cpk=${Cpk.toFixed(2)} → NOT capable vs target — focus here.`
+      );
+    }
+
+    statsFocusDiv.innerHTML += `<div style="margin-bottom:12px;">${blk}</div>`;
+  }
+}
   function renderStatsDetail(){
     statsBody.innerHTML='';
     const groups = groupByProcess();
@@ -1701,7 +1483,7 @@
     contractSummary.appendChild(frag);
   }
 
-  // NEW: Capacity Snapshot (líneas 1 y 2 debajo del resumen)
+  // SNAPSHOT de capacidad (líneas 1 y 2 debajo del resumen)
   function renderCapacitySnapshot(){
     if(!capacitySnapshotDiv) return;
 
@@ -1743,7 +1525,7 @@
     else capCurr = perHourCurr*hours*days;
     const capCurrEff = capCurr*(eff/100);
 
-    // Potencial usando P10 (mejor 10% de tiempos)
+    // Potencial usando P10 (mejor 10%)
     const ctPot = st.p10 && st.p10 > 0 ? st.p10 : ctMed;
     let perHourPot = 3600/ctPot;
     let capPot = 0;
@@ -1810,7 +1592,7 @@
       const mean = st.mean;
       const med = st.median;
 
-      // tamaño de muestra recomendado según variación (regla simple)
+      // tamaño de muestra recomendado según variación
       let recN;
       if(cv<=0.10) recN = 10;
       else if(cv<=0.20) recN = 15;
@@ -1880,8 +1662,8 @@
         const USL = ctTarget;
         const LSL = 0;
         const cpv = (USL-LSL)/(6*st.std);
-        const cpu = (USL-mean)/(3*st.std);
-        const cpl = (mean-LSL)/(3*st.std);
+        const cpu = (USL-st.mean)/(3*st.std);   // ← YA CORREGIDO
+        const cpl = (st.mean-LSL)/(3*st.std);
         const cpkv = Math.min(cpu,cpl);
         if(cpkv<1.0){
           capClass='focus-bad';
@@ -1919,7 +1701,6 @@
       statsFocusDiv.appendChild(block);
     });
   }
-
   // ===== Gráficas =====
   function updateChartOptions(){
     const groups = groupByProcess();
@@ -2189,7 +1970,6 @@
     ctx.lineTo(p90x,h-padB);
     ctx.stroke();
   }
-
   async function copyToClipboard(text){
     if(!text) return;
     try{
