@@ -2467,9 +2467,9 @@ function yieldFromScrap(row){
       ddMinutes(row.scrapPct ?? 0, 0, 100, 5, v=>{ row.scrapPct=v; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
       td(pct(y*100,1));
 
-      ddMinutes(row.oeeA ?? 100, 0, 100, 5, v=>{ row.oeeA=v; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
-      ddMinutes(row.oeeP ?? 100, 0, 100, 5, v=>{ row.oeeP=v; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
-      ddMinutes(row.oeeQ ?? 100, 0, 100, 5, v=>{ row.oeeQ=v; row.qAuto=false; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
+      ddMinutes(row.oeeA ?? 100, 0, 100, 1, v=>{ row.oeeA=v; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
+      ddMinutes(row.oeeP ?? 100, 0, 100, 1, v=>{ row.oeeP=v; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
+      ddMinutes(row.oeeQ ?? 100, 0, 100, 1, v=>{ row.oeeQ=v; row.qAuto=false; saveWB(); renderAll(); scheduleSaveAll(); }, 'wb-sel narrow');
 
       td(pct(oee,1));
 
@@ -2523,7 +2523,7 @@ function yieldFromScrap(row){
   }
 
   btnWbAdd.addEventListener('click',()=>{
-    lockBtn(btnWbAdd,6000);
+    lockBtn(btnWbAdd,1000);
     const r = defaultWbRow();
     wbRows.push(r);
     saveWB();
